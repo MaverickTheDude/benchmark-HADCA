@@ -10,10 +10,13 @@ int main(int argc, char* argv[]) {
     // const int Nbodies = argv[1];
     const int Nbodies = 2;
     _input_ input = _input_(Nbodies);
-    Vector2d r1(0.0, 0.0), r2(_L_/sqrt(2), _L_/sqrt(2));
-    double fi1(0.0), fi2(M_PI/4);
+
+    Vector2d r2(_L_/sqrt(2), _L_/sqrt(2));
+    double fi2(M_PI/4);
     VectorXd q(6);
-    q << r1, fi1, r2, fi2;
+    q.block(0, 0, 3, 1) = input.getCartInitialPosition_absolute();
+    q.block(3, 0, 2, 1) = r2;
+    q(5) = fi2;
 
     MatrixXd fd = jacobianReal(Phi, q, input);
 

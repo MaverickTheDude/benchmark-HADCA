@@ -34,11 +34,18 @@ public:
     const int Nconstr = 2*Nbodies;
     VectorXd alfa0, dalfa0;
     std::vector<body> bodies;
+
+    Vector3d getCartInitialPosition_absolute();
+
+private:
+    Vector3d cartInitialPosition_absolute;
 };
+
 Matrix2d Rot(double fi);
 MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd&, const _input_&), VectorXd alfa0, _input_ input);
 VectorXd Phi(const VectorXd& q, const _input_& input);
 MatrixXd Jacobian(const VectorXd& q, const _input_& input);
+VectorXd jointToAbsoluteCoordinates(const VectorXd jointCoordsAlpha, _input_ input);
 
 const Matrix2d I = Matrix2d::Identity();
 const Matrix2d Om = Rot(M_PI_2);

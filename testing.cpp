@@ -40,8 +40,24 @@ void test_Fq(void) {
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
 }
 
+void test_jointToAbsoluteCoordinates(void) {
+    _input_ input = _input_(3);
+    Vector3d jointCoordsAlpha(0.0, M_PI_4, M_PI_4);
+
+    VectorXd absoluteCoords = jointToAbsoluteCoordinates(input.alfa0, input);
+
+    VectorXd absoluteCoords_ideal(3 * 3);
+    absoluteCoords_ideal << 0.0, 0.0, 0.0,
+        0.0, 0.0, M_PI_4,
+        _L_*cos(M_PI_4), _L_*sin(M_PI_4), M_PI_4 + M_PI_4;
+
+    VectorXd diff = absoluteCoords_ideal - absoluteCoords;
+    TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
+}
+
 TEST_LIST = {
    { "test1", test_Phi },
    { "test2", test_Fq },
+   { "jointToAbsoluteCoordinates()", test_jointToAbsoluteCoordinates },
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

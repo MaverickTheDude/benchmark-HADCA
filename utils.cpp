@@ -6,6 +6,15 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alfa0(_Nbodies_), dalfa0(_
     alfa0(0) = 0.0;
     alfa0.tail(_Nbodies_-1).setConstant(M_PI_4);
     dalfa0.setZero();
+
+    cartInitialPosition_absolute << 0.0, 0.0, 0.0;
+}
+
+Vector3d _input_::getCartInitialPosition_absolute() {
+    /**
+     * Returns initial position of the cart (absolute coordinates)
+     */
+    return cartInitialPosition_absolute;
 }
 
 body::body(std::string type) {
@@ -50,4 +59,20 @@ MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd&, const _input_&), VectorXd
     }
 
     return Fun_q;
+}
+
+VectorXd jointToAbsoluteCoordinates(const VectorXd jointCoordsAlpha, _input_ input) {
+    /**
+     * Converts joint coordinates to absolute coordinates (3 * number_of_bodies)
+     */
+    VectorXd absoluteCoordinates(3 * input.Nbodies);
+    absoluteCoordinates.block(0, 0, 3, 1) = input.getCartInitialPosition_absolute();
+
+    for(int i = 1; i < input.Nbodies; i++)
+    {
+        absoluteCoordinates.block((3*i + 0), 0, 2, 1) = absoluteCoordinates.block((3*(i-1) + 0), 0, 2, 1) + Rot(jointCoordsAlpha(i)) * input.bodies[i-1].s12;
+        absoluteCoordinates(3*i + 2) = absoluteCoordinates(3*(i-1) + 2) + jointCoordsAlpha(i);
+    }
+
+    return absoluteCoordinates;
 }
