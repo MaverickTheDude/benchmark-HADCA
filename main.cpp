@@ -14,8 +14,8 @@ int main(int argc, char* argv[]) {
     Vector2d r2(_L_/sqrt(2), _L_/sqrt(2));
     double fi2(M_PI/4);
     VectorXd q(6);
-    q.block(0, 0, 3, 1) = input.getCartInitialPosition_absolute();
-    q.block(3, 0, 2, 1) = r2;
+    q.segment(0, 3) = input.getCartInitialPosition_absolute();
+    q.segment(3, 2) = r2;
     q(5) = fi2;
 
     MatrixXd fd = jacobianReal(Phi, q, input);
