@@ -1,15 +1,34 @@
 #include<project.h>
 
-_input_::_input_() : sA1(2.0, 0.0), sA2(3.0, 0.0) {    }
+_input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alfa0(_Nbodies_), dalfa0(_Nbodies_) {
+    bodies.emplace_back("box");
+    bodies.emplace_back("link");
+    alfa0(0) = 0.0;
+    alfa0.tail(_Nbodies_-1).setConstant(M_PI_4);
+    dalfa0.setZero();
+}
+
+body::body(std::string type) {
+    m = _m_;
+    J = _J_;
+    if ( ! type.compare("box") ) {
+        s1C.setZero();
+        s12.setZero();
+        H << 1, 0, 0;
+        D << 0, 0, 1, 0, 0, 1;
+    }
+    else if ( ! type.compare("link") ) {
+        s1C << _L_/2, 0;
+        s12 << _L_  , 0;
+        H << 0, 0, 1;
+        D << 1, 0, 0, 1, 0, 0;
+    }
+    else
+        throw std::runtime_error("not supported body / joint");
+}
 
 Matrix2d Rot(double fi) {
 	Matrix2d R;
-	R << cos(fi), -sin(fi), sin(fi), cos(fi);
-	return R;
-}
-
-Matrix2cd Rot(std::complex<double> fi) {
-	Matrix2cd R;
 	R << cos(fi), -sin(fi), sin(fi), cos(fi);
 	return R;
 }
@@ -28,26 +47,6 @@ MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd&, const _input_&), VectorXd
         MatrixXd funForward = fun(qFF, input);
         MatrixXd funRev     = fun(qRV, input);
         Fun_q.col(i) = (funForward - funRev) / (2*h);
-    }
-
-    return Fun_q;
-}
-
-// Test zespolonych roznic skonczonych. Ok! Ale usuwamy, bo RealFD wygodniejsze
-MatrixXd jacobianComplex(VectorXcd (*fun)(const VectorXcd&, const _input_&), VectorXd q0, _input_ input) {
-    std::complex<double> j(0,1);
-    const double h = 1e-8;
-    const int n = q0.size();
-    const int Nf = input.Nconstr;
-
-    MatrixXd Fun_q = MatrixXd::Zero(Nf, n);
-    for (int i = 0; i < n; i++) {
-        
-        VectorXcd delta = ArrayXcd::Zero(n);
-        delta(i) = h*j;
-        VectorXcd qFF = q0 + delta;
-        MatrixXcd funForward = fun(qFF, input);
-        Fun_q.col(i) = funForward.imag() / h;
     }
 
     return Fun_q;
