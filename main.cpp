@@ -5,37 +5,20 @@ using std::cout;
 using std::endl;
 
 
-
 int main(int argc, char* argv[]) {
     // const int Nbodies = argv[1];
     const int Nbodies = 2;
     _input_ input = _input_(Nbodies);
+    
+    VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
+    Assembly A(0, alphaAbs, input.pjoint0, input);
+    Assembly B(1, alphaAbs, input.pjoint0, input);
+    Assembly C(A, B);
 
-    Vector2d r2(_L_/sqrt(2), _L_/sqrt(2));
-    double fi2(M_PI/4);
-    VectorXd q(6);
-    q.segment(0, 3) = input.getCartInitialPosition_absolute();
-    q.segment(3, 2) = r2;
-    q(5) = fi2;
-
-    MatrixXd fd = jacobianReal(Phi, q, input);
-
-    MatrixXd Jac = Jacobian(q, input);
-
-    MatrixXd diff = fd - Jac;
-
-    body b1("box");
-    body b2("link");
-
-//     cout << b1.sCM << endl << b1.H << endl << b1.D << b1.m;
-//     cout << endl << endl;
-//     cout << b2.sCM << endl << b2.H << endl << b2.D << b2.m; 
-
-    // cout << "q = " << endl << q << endl << endl;
-    // cout << "phi = " << endl << phi << endl << endl;
-    cout << "Phi_qFD = " << endl << fd << endl << endl;
-    // cout << "Phi_q = " << endl << Jac << endl << endl;
-    // cout << "diff = " << endl << diff << endl << endl;
+    cout << " ksi: "     << endl << C.ksi.k12() << endl;
+    cout << " Q1Acc: "   << endl << C.Q1Acc << endl;
+    cout << " S12 link " << endl << C.ptrAsmB->S12 << endl;
+    cout << " Q2box  "   << endl << C.ptrAsmA->Q2Art << endl;
 
     return 0;
 }
