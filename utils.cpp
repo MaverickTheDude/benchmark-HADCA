@@ -11,6 +11,12 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(_Nbodies_),
     pjoint0.setZero();
 }
 
+std::pair<VectorXd,VectorXd>  _input_::getPJointAndSigma()
+{
+    std::pair<VectorXd, VectorXd> PJointAndSigma;
+    return PJointAndSigma;
+}
+
 body::body(std::string type)
 {
     m = _m_;

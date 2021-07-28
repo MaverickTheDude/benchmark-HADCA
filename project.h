@@ -31,6 +31,7 @@ public:
     body pickBodyType(int bodyId) const {
         return (bodyId == 0) ? bodyTypes[0] : bodyTypes[1];
     }
+    std::pair<VectorXd,VectorXd> getPJointAndSigma();
 
 public:
     const int Nbodies;
