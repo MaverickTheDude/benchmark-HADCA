@@ -15,7 +15,7 @@ static const double eps = 1e-7;
 void test_Phi(void) {
     _input_ input = _input_(2);
     VectorXd q(6);
-    q = jointToAbsoluteCoordinates(input.alpha0, input);
+    q = jointToAbsolutePosition(input.alpha0, input);
 
     Vector4d phi  = Phi(q, input);
 
@@ -25,7 +25,7 @@ void test_Phi(void) {
 void test_Fq(void) {
     _input_ input = _input_(2);
     VectorXd q(6);
-    q = jointToAbsoluteCoordinates(input.alpha0, input);
+    q = jointToAbsolutePosition(input.alpha0, input);
 
     MatrixXd fd   = jacobianReal(Phi, q, input);
     MatrixXd Jac  = Jacobian(q, input);
@@ -34,11 +34,10 @@ void test_Fq(void) {
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
 }
 
-void test_jointToAbsoluteCoordinates(void) {
+void test_jointToAbsolutePosition(void) {
     _input_ input = _input_(5);
-    Vector3d jointCoordsAlpha(0.0, M_PI_4, M_PI_4);
 
-    VectorXd absoluteCoords = jointToAbsoluteCoordinates(input.alpha0, input);
+    VectorXd absoluteCoords = jointToAbsolutePosition(input.alpha0, input);
 
     VectorXd absoluteCoords_ideal(3 * 5);
     absoluteCoords_ideal << 0.0, 0.0, 0.0,
@@ -51,10 +50,29 @@ void test_jointToAbsoluteCoordinates(void) {
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
 }
 
+void test_jointToAbsoluteVelocity(void) {
+    _input_ input = _input_(5);
+    VectorXd alpha = VectorXd::Zero(5);
+    VectorXd dalpha(5);
+    dalpha << 1.0, M_PI_2, -M_PI_2, M_PI_2, -M_PI_2;
+
+    VectorXd dq = jointToAbsoluteVelocity(alpha, dalpha, input);
+
+    VectorXd dq_ideal(3 * 5);
+    dq_ideal << 1.0, 0.0, 0.0,
+        1.0, 0.0, M_PI_2,
+        1.0, M_PI_2, 0.0,
+        1.0, 0, M_PI_2,
+        1.0, M_PI_2, 0.0;
+
+    TEST_CHECK_((dq - dq_ideal).norm() <= eps, "max error = %f", (dq - dq_ideal).norm());
+}
+
 
 TEST_LIST = {
    { "phi", test_Phi },
    { "jacobian", test_Fq },
-   { "joint2Abs", test_jointToAbsoluteCoordinates },
+   { "joint2AbsPosition", test_jointToAbsolutePosition },
+   { "joint2AbsVelocity", test_jointToAbsoluteVelocity },
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };
