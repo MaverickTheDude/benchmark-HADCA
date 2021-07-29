@@ -98,16 +98,21 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
      * Converts joint velocity dalpha to absolute velocity dq (3 * number_of_bodies)
      */
     VectorXd dq(3 * input.Nbodies);
+    VectorXd alphaAbsolute(input.Nbodies);
 
     dq.segment(0, 3) << dalpha(0), 0.0, 0.0;
     dq.segment(3, 3) << dalpha(0), 0.0, dalpha(1);
+
+    alphaAbsolute.segment(0, 2) << 0.0, alpha(1);
 
     for (int i = 2; i < input.Nbodies; i++)
     {
         const int prev = i - 1;
         dq.segment(3 * i, 2) = dq.segment(3 * prev, 2) +
-                    Om*Rot(alpha(prev)) * dalpha(prev) * input.pickBodyType(prev).s12;
+                    Om*Rot(alphaAbsolute(prev)) * dalpha(prev) * input.pickBodyType(prev).s12;
         dq(3 * i + 2) = dq(3 * prev + 2) + dalpha(i);
+
+        alphaAbsolute(i) = alphaAbsolute(prev) + alpha(i);
     }
 
     return dq;

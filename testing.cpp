@@ -78,7 +78,6 @@ void test_jointToAbsoluteVelocity2(void) {
     const Matrix3d S12_2 = SAB("s12", 2, alphaAbs, input);
     const Matrix3d s12[] = {S12_0, S12_1, S12_2};
     
-// jak test sie powiedzie, mozna wsadzic do petli for
     int i = 0;
     Vector3d Vref;
     Vref << input.dalpha0(i), 0.0, 0.0; // == H0 * dalfa0
