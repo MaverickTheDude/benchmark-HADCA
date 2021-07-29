@@ -23,7 +23,7 @@ void  _input_::setPJointAndSigma(void)
     const VectorXd dq = jointToAbsoluteVelocity(alpha0, dalpha0, *this);
 
     Vector3d PP = Vector3d::Zero();
-    for(int bodyId = Nbodies - 1; bodyId > 0; bodyId--)
+    for(int bodyId = Nbodies - 1; bodyId >= 0; bodyId--)
     {
         const Matrix3d S1C = SAB("s1C", bodyId, alphaAbs, *this);
         const Matrix3d M1 = S1C * massMatrix(bodyId, *this) * S1C.transpose();
@@ -108,7 +108,7 @@ VectorXd jointToAbsolutePosition(const VectorXd &alpha, const _input_ &input)
     {
         const int prev = i - 1;
         q.segment(3 * i, 2) = q.segment(3 * prev, 2) +
-                              Rot(alpha(prev)) * input.pickBodyType(prev).s12;
+                              Rot(q(3 * prev + 2)) * input.pickBodyType(prev).s12;
         q(3 * i + 2) = q(3 * prev + 2) + alpha(i);
     }
 
@@ -132,7 +132,7 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
     {
         const int prev = i - 1;
         dq.segment(3 * i, 2) = dq.segment(3 * prev, 2) +
-                    Om*Rot(alphaAbsolute(prev)) * dalpha(prev) * input.pickBodyType(prev).s12;
+                    Om*Rot(alphaAbsolute(prev)) * dq(3 * prev + 2) * input.pickBodyType(prev).s12;
         dq(3 * i + 2) = dq(3 * prev + 2) + dalpha(i);
 
         alphaAbsolute(i) = alphaAbsolute(prev) + alpha(i);
@@ -146,7 +146,7 @@ Matrix3d SAB(const std::string &_sAB_, const int id, const VectorXd &alphaAbs, c
 {
     Vector2d sAB = input.pickBodyType(id).dimensions.at(_sAB_);
     Matrix3d out = Matrix3d::Identity();
-    out.block(2, 0, 1, 2) = (Om * alphaAbs(id) * sAB).transpose();
+    out.block(2, 0, 1, 2) = (Om * Rot(alphaAbs(id)) * sAB).transpose();
     return out;
 }
 

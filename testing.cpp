@@ -37,14 +37,17 @@ void test_Fq(void) {
 void test_jointToAbsolutePosition(void) {
     _input_ input = _input_(5);
 
-    VectorXd absoluteCoords = jointToAbsolutePosition(input.alpha0, input);
+    VectorXd alpha(input.Nbodies);
+    alpha.tail(input.Nbodies - 1).setConstant(0);
+    alpha(1) = M_PI_4;
+    VectorXd absoluteCoords = jointToAbsolutePosition(alpha, input);
 
     VectorXd absoluteCoords_ideal(3 * 5);
     absoluteCoords_ideal << 0.0, 0.0, 0.0,
         0.0, 0.0, M_PI_4,
-        _L_*cos(M_PI_4), _L_*sin(M_PI_4), M_PI_4 + M_PI_4,
-        2*_L_*cos(M_PI_4), 2*_L_*sin(M_PI_4), M_PI_4 + M_PI_4 + M_PI_4,
-        3*_L_*cos(M_PI_4), 3*_L_*sin(M_PI_4), M_PI_4 + M_PI_4 + M_PI_4 + M_PI_4;
+        _L_*cos(M_PI_4), _L_*sin(M_PI_4), M_PI_4,
+        2*_L_*cos(M_PI_4), 2*_L_*sin(M_PI_4), M_PI_4,
+        3*_L_*cos(M_PI_4), 3*_L_*sin(M_PI_4), M_PI_4;
 
     VectorXd diff = absoluteCoords_ideal - absoluteCoords;
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
@@ -54,16 +57,16 @@ void test_jointToAbsoluteVelocity1(void) {
     _input_ input = _input_(5);
     VectorXd alpha = VectorXd::Zero(5);
     VectorXd dalpha(5);
-    dalpha << 1.0, M_PI_2, -M_PI_2, M_PI_2, -M_PI_2;
+    dalpha << 1.0, M_PI_2, 0, 0, 0;
 
     VectorXd dq = jointToAbsoluteVelocity(alpha, dalpha, input);
 
     VectorXd dq_ideal(3 * 5);
     dq_ideal << 1.0, 0.0, 0.0,
         1.0, 0.0, M_PI_2,
-        1.0, M_PI_2, 0.0,
-        1.0, 0, M_PI_2,
-        1.0, M_PI_2, 0.0;
+        1.0, M_PI_2, M_PI_2,
+        1.0, 2*M_PI_2, M_PI_2,
+        1.0, 3*M_PI_2, M_PI_2;
 
     TEST_CHECK_((dq - dq_ideal).norm() <= eps, "max error = %f", (dq - dq_ideal).norm());
 }
@@ -83,14 +86,20 @@ void test_jointToAbsoluteVelocity2(void) {
     Vref << input.dalpha0(i), 0.0, 0.0; // == H0 * dalfa0
     Vector3d test = dq.segment(3*i, 3);
     Vector3d diff = test - Vref; 
-    TEST_CHECK_(diff.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff.norm(), Vref(0), Vref(1), Vref(2));
+    TEST_CHECK_(diff.norm() <= eps, "result = [%f, %f, %f], ref. result = [%f, %f, %f] in bodyId = %d",
+        test(0), test(1), test(2), 
+        Vref(0), Vref(1), Vref(2),
+        i);
 
     for(int i = 1; i < 4; i++)
     {
         test = dq.segment(3*i, 3);
         Vref = s12[i-1].transpose() * Vref + input.pickBodyType(i).H * input.dalpha0(i);
         diff = test - Vref;
-        TEST_CHECK_(diff.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff.norm(), Vref(0), Vref(1), Vref(2));
+        TEST_CHECK_(diff.norm() <= eps, "result = [%f, %f, %f], ref. result = [%f, %f, %f] in bodyId = %d",
+            test(0), test(1), test(2), 
+            Vref(0), Vref(1), Vref(2),
+            i);
     }
 }
 
@@ -98,7 +107,7 @@ void test_jointToAbsoluteVelocity2(void) {
 void test_SetPJoint(void) {
     _input_ input = _input_(4);
 
-    for( int id = 0; id <= input.Nbodies - 2; id++)
+    for( int id = input.Nbodies - 2; id >= 0; id--)
     {
         VectorXd sigmaStacked = input.sigma0;
         VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
@@ -122,12 +131,18 @@ void test_SetPJoint(void) {
         
         Vector3d RHS1 = H * input.pjoint0(id) + D * sigma - S12 * (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
         Vector3d RHS2 = S21 * (H * input.pjoint0(id) + D * sigma) - (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
-        VectorXd diff1 = M1 * V1 - RHS1;
-        VectorXd diff2 = M2 * V2 - RHS2;
-        TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f] in body id = %d",
-            diff1.norm(), RHS1(0), RHS1(1), RHS1(2), id);
-        TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f] in body id = %d",
-            diff2.norm(), RHS2(0), RHS2(1), RHS2(2), id);
+        Vector3d M1V1 = M1 * V1;
+        Vector3d M2V2 = M2 * V2;
+        VectorXd diff1 = M1V1 - RHS1;
+        VectorXd diff2 = M2V2 - RHS2;
+        TEST_CHECK_(diff1.norm() <= eps, "result = [%f, %f, %f], ref. result = [%f, %f, %f] in bodyId = %d",
+            RHS1(0), RHS1(1), RHS1(2),
+            M1V1(0), M1V1(1), M1V1(2),
+            id);
+        TEST_CHECK_(diff2.norm() <= eps, "result = [%f, %f, %f], ref. result = [%f, %f, %f] in bodyId = %d",
+            RHS2(0), RHS2(1), RHS2(2),
+            M2V2(0), M2V2(1), M2V2(2),
+            id);
     }
 }
 
@@ -166,7 +181,7 @@ TEST_LIST = {
    { "joint2AbsPosition", test_jointToAbsolutePosition },
    { "joint2AbsVelocity (Test 1)", test_jointToAbsoluteVelocity1 },
    { "joint2AbsVelocity (Test 2)", test_jointToAbsoluteVelocity2 },
-   { "_input_.setPJointAndSigma()", test_SetPJoint },
+   { "_input_.setPJointAndSigma", test_SetPJoint },
    { "setAssembly", test_SetAssembly },
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };
