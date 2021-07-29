@@ -95,36 +95,41 @@ void test_jointToAbsoluteVelocity2(void) {
 }
 
 
-// void test_SetPJoint(void) {
-//     int id = 2; // mozna testowac od id = 0 do id = Nbodies - 2
-//     _input_ input = _input_(4);
-//     VectorXd sigmaStacked = input.getPJointAndSigma().second;
-//     VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
-//     VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
-//     const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
-//     const Matrix3d S21 = SAB("s21", id, alphaAbs, input);
-//     const Matrix3d S1C = SAB("s1C", id, alphaAbs, input);
-//     const Matrix3d S2C = SAB("s2C", id, alphaAbs, input);
-//     const Matrix3d Mc = massMatrix(id, input);
-//     const Matrix3d M1 = S1C * Mc * S1C.transpose();
-//     const Matrix3d M2 = S2C * Mc * S2C.transpose();
+void test_SetPJoint(void) {
+    _input_ input = _input_(4);
 
-//     Vector3d V1 = dq.segment(3*id, 3);
-//     Vector3d V2 = S12.transpose() * V1;
-//     Vector3d H = input.pickBodyType(id).H;
-//     Vector3d D = input.pickBodyType(id).D;
-//     Vector3d Hnext = input.pickBodyType(id+1).H; // note: upewnic sie, ze sprawdzamy dla nie-ostatniego czlonu
-//     Vector3d Dnext = input.pickBodyType(id+1).D;
-//     Vector2d sigma = sigmaStacked.segment(2*id, 2);
-//     Vector2d sigmaNext = sigmaStacked.segment(2*(id+1), 2);
-    
-//     Vector3d RHS1 = H * input.pjoint0(id) + D * sigma - S12 * (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
-//     Vector3d RHS2 = S21 * (H * input.pjoint0(id) + D * sigma) - (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
-//     VectorXd diff1 = M1 * V1 - RHS1;
-//     VectorXd diff2 = M2 * V2 - RHS2;
-//     TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff1.norm(), RHS1(1), RHS1(2), RHS1(3));
-//     TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff2.norm(), RHS2(2), RHS2(2), RHS2(3));
-// }
+    for( int id = 0; id <= input.Nbodies - 2; id++)
+    {
+        VectorXd sigmaStacked = input.sigma0;
+        VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
+        VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
+        const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
+        const Matrix3d S21 = SAB("s21", id, alphaAbs, input);
+        const Matrix3d S1C = SAB("s1C", id, alphaAbs, input);
+        const Matrix3d S2C = SAB("s2C", id, alphaAbs, input);
+        const Matrix3d Mc = massMatrix(id, input);
+        const Matrix3d M1 = S1C * Mc * S1C.transpose();
+        const Matrix3d M2 = S2C * Mc * S2C.transpose();
+
+        Vector3d V1 = dq.segment(3*id, 3);
+        Vector3d V2 = S12.transpose() * V1;
+        Vector3d H = input.pickBodyType(id).H;
+        MatrixXd D = input.pickBodyType(id).D;
+        Vector3d Hnext = input.pickBodyType(id+1).H; // note: upewnic sie, ze sprawdzamy dla nie-ostatniego czlonu
+        MatrixXd Dnext = input.pickBodyType(id+1).D;
+        Vector2d sigma = sigmaStacked.segment(2*id, 2);
+        Vector2d sigmaNext = sigmaStacked.segment(2*(id+1), 2);
+        
+        Vector3d RHS1 = H * input.pjoint0(id) + D * sigma - S12 * (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
+        Vector3d RHS2 = S21 * (H * input.pjoint0(id) + D * sigma) - (Hnext * input.pjoint0(id+1) + Dnext * sigmaNext);
+        VectorXd diff1 = M1 * V1 - RHS1;
+        VectorXd diff2 = M2 * V2 - RHS2;
+        TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f] in body id = %d",
+            diff1.norm(), RHS1(0), RHS1(1), RHS1(2), id);
+        TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f] in body id = %d",
+            diff2.norm(), RHS2(0), RHS2(1), RHS2(2), id);
+    }
+}
 
 // void test_SetAssembly(void) {
 //     int id = 2; // mozna testowac od id = 0 do id = Nbodies - 2
@@ -158,5 +163,6 @@ TEST_LIST = {
    { "joint2AbsPosition", test_jointToAbsolutePosition },
    { "joint2AbsVelocity (Test 1)", test_jointToAbsoluteVelocity1 },
    { "joint2AbsVelocity (Test 2)", test_jointToAbsoluteVelocity2 },
+   { "_input_.setPJointAndSigma()", test_SetPJoint },
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };
