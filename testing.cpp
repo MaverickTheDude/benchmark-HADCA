@@ -131,30 +131,30 @@ void test_SetPJoint(void) {
     }
 }
 
-// void test_SetAssembly(void) {
-//     int id = 2; // mozna testowac od id = 0 do id = Nbodies - 2
-//     _input_ input = _input_(4);
-//     VectorXd sigmaStacked = input.getPJointAndSigma().second;
-//     VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
-//     VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
-//     Assembly body(0, alphaAbs, input.pjoint0, input);
-//     Vector3d T1A = input.pickBodyType(id).D   * sigmaStacked.segment(2*id, 2);
-//     // minus, poniewaz sigma ma znak + w interfejsie 1
-//     Vector3d T2A = - input.pickBodyType(id+1).D * sigmaStacked.segment(2*(id+1), 2); // note: upewnic sie, ze sprawdzamy dla nie-ostatniego czlonu
+void test_SetAssembly(void) {
+    int id = 2; // mozna testowac od id = 0 do id = Nbodies - 2
+    _input_ input = _input_(4);
+    VectorXd sigmaStacked = input.sigma0;
+    VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
+    VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
+    Assembly body(0, alphaAbs, input.pjoint0, input);
+    Vector3d T1A = input.pickBodyType(id).D   * sigmaStacked.segment(2*id, 2);
+    // minus, poniewaz sigma ma znak + w interfejsie 1
+    Vector3d T2A = - input.pickBodyType(id+1).D * sigmaStacked.segment(2*(id+1), 2); // note: upewnic sie, ze sprawdzamy dla nie-ostatniego czlonu
 
-//     VectorXd RHS1 = body.ksi.k11() * T1A + body.ksi.k12() * T2A + body.ksi.k10();
-//     VectorXd RHS2 = body.ksi.k21() * T1A + body.ksi.k22() * T2A + body.ksi.k10();
+    VectorXd RHS1 = body.ksi.k11() * T1A + body.ksi.k12() * T2A + body.ksi.k10();
+    VectorXd RHS2 = body.ksi.k21() * T1A + body.ksi.k22() * T2A + body.ksi.k10();
 
-//     const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
-//     Vector3d V1 = dq.segment(3*id, 3);
-//     Vector3d V2 = S12.transpose() * V1;
+    const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
+    Vector3d V1 = dq.segment(3*id, 3);
+    Vector3d V2 = S12.transpose() * V1;
 
-//     Vector3d diff1 = V1 - RHS1;
-//     Vector3d diff2 = V2 - RHS2;
+    Vector3d diff1 = V1 - RHS1;
+    Vector3d diff2 = V2 - RHS2;
 
-//     TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff1.norm(), RHS1(1), RHS1(2), RHS1(3));
-//     TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff2.norm(), RHS2(1), RHS2(2), RHS2(3));
-// }
+    TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff1.norm(), RHS1(0), RHS1(1), RHS1(2));
+    TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff2.norm(), RHS2(0), RHS2(1), RHS2(2));
+}
 
 
 TEST_LIST = {
@@ -164,5 +164,6 @@ TEST_LIST = {
    { "joint2AbsVelocity (Test 1)", test_jointToAbsoluteVelocity1 },
    { "joint2AbsVelocity (Test 2)", test_jointToAbsoluteVelocity2 },
    { "_input_.setPJointAndSigma()", test_SetPJoint },
+   { "setAssembly", test_SetAssembly },
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };
