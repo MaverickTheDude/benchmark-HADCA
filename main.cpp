@@ -1,5 +1,10 @@
-#include<iostream>
-#include<project.h>
+#include "include/input.h"
+#include "include/utils.h"
+#include "include/assembly.h"
+#include "Eigen/Dense"
+
+#include <iostream>
+
 using namespace Eigen;
 using std::cout;
 using std::endl;

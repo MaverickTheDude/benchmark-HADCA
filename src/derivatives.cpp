@@ -1,5 +1,11 @@
-#include<project.h>
-#include <iostream>
+#include "../include/derivatives.h"
+
+#include "../include/input.h"
+#include "../include/utils.h"
+#include "../include/constants.h"
+#include "../Eigen/Dense"
+
+using namespace Eigen;
 
 VectorXd Phi(const VectorXd& q, const _input_& input) {
     const int Nf = input.Nconstr;

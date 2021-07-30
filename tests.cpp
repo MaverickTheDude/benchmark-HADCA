@@ -6,11 +6,27 @@ $ ./test_example test1 test2    # Runs only tests specified
 $ ./test_example --skip test3   # Runs all tests but those specified
 */
 
-#include "acutest.h"
-#include "project.h"
+/**
+ * We put global includes at the top:
+ *  - acutest.h - acutest library
+ *  - iostream - in case a verbose debugging is needed
+ * 
+ * Other libraries / headers are included at the top of each test function
+ * as tailored to its needs. This way it is easier to maintain these test
+ * functions into other files, just in case.
+ */
+#include "Acutest/acutest.h"
+
 #include <iostream>
 static const double eps = 1e-7;
 
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/derivatives.h"
+#include "include/utils.h"
+
+using namespace Eigen;
 
 void test_Phi(void) {
     _input_ input = _input_(2);
@@ -21,6 +37,14 @@ void test_Phi(void) {
 
     TEST_CHECK_(phi.norm() <= eps, "max error = %f", phi.norm());
 }
+
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+#include "include/derivatives.h"
+
+using namespace Eigen;
 
 void test_Fq(void) {
     _input_ input = _input_(2);
@@ -33,6 +57,14 @@ void test_Fq(void) {
 
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
 }
+
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+#include "include/constants.h"
+
+using namespace Eigen;
 
 void test_jointToAbsolutePosition(void) {
     _input_ input = _input_(5);
@@ -53,6 +85,13 @@ void test_jointToAbsolutePosition(void) {
     TEST_CHECK_(diff.norm() <= eps, "max error = %f", diff.norm());
 }
 
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+
+using namespace Eigen;
+
 void test_jointToAbsoluteVelocity1(void) {
     _input_ input = _input_(5);
     VectorXd alpha = VectorXd::Zero(5);
@@ -71,6 +110,12 @@ void test_jointToAbsoluteVelocity1(void) {
     TEST_CHECK_((dq - dq_ideal).norm() <= eps, "max error = %f", (dq - dq_ideal).norm());
 }
 
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+
+using namespace Eigen;
 
 void test_jointToAbsoluteVelocity2(void) {
     _input_ input = _input_(4);
@@ -103,6 +148,12 @@ void test_jointToAbsoluteVelocity2(void) {
     }
 }
 
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+
+using namespace Eigen;
 
 void test_SetPJoint(void) {
     _input_ input = _input_(4);
@@ -145,6 +196,13 @@ void test_SetPJoint(void) {
             id);
     }
 }
+
+#include "include/input.h"
+#include "Eigen/Dense"
+#include "include/utils.h"
+#include "include/assembly.h"
+
+using namespace Eigen;
 
 void test_SetAssembly(void) {
     _input_ input = _input_(4);
