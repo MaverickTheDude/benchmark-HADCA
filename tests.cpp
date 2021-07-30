@@ -207,18 +207,21 @@ using namespace Eigen;
 void test_SetAssembly(void) {
     _input_ input = _input_(4);
 
-    for( int id = 0; id <= input.Nbodies - 2; id++)
+    for( int id = 0; id <= input.Nbodies - 1; id++)
     {
         VectorXd sigmaStacked = input.sigma0;
         VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
         VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
-        Assembly body(0, alphaAbs, input.pjoint0, input);
+        Assembly body(id, alphaAbs, input.pjoint0, input);
         Vector3d T1A = input.pickBodyType(id).D   * sigmaStacked.segment(2*id, 2);
-        // minus, poniewaz sigma ma znak + w interfejsie 1
-        Vector3d T2A = - input.pickBodyType(id+1).D * sigmaStacked.segment(2*(id+1), 2); // note: upewnic sie, ze sprawdzamy dla nie-ostatniego czlonu
+        Vector3d T2A;
+        if (id == input.Nbodies - 1)
+            T2A = Vector3d::Zero(); // dla ostatniego czlonu
+        else
+            T2A = - input.pickBodyType(id+1).D * sigmaStacked.segment(2*(id+1), 2); // minus, poniewaz sigma ma znak + w interfejsie 1
 
         VectorXd RHS1 = body.ksi.k11() * T1A + body.ksi.k12() * T2A + body.ksi.k10();
-        VectorXd RHS2 = body.ksi.k21() * T1A + body.ksi.k22() * T2A + body.ksi.k10();
+        VectorXd RHS2 = body.ksi.k21() * T1A + body.ksi.k22() * T2A + body.ksi.k20();
 
         const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
         Vector3d V1 = dq.segment(3*id, 3);
@@ -227,8 +230,10 @@ void test_SetAssembly(void) {
         Vector3d diff1 = V1 - RHS1;
         Vector3d diff2 = V2 - RHS2;
 
-        TEST_CHECK_(diff1.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff1.norm(), RHS1(0), RHS1(1), RHS1(2));
-        TEST_CHECK_(diff2.norm() <= eps, "error = %f, value = [%f, %f, %f]", diff2.norm(), RHS2(0), RHS2(1), RHS2(2));
+        TEST_CHECK_(diff1.norm() <= eps, "error1 = %f, \n Rvalue1 = [%f, %f, %f], \n Tvalue1 = [%f, %f, %f]", 
+                    diff1.norm(), V1(0), V1(1), V1(2), RHS1(0), RHS1(1), RHS1(2));
+        TEST_CHECK_(diff2.norm() <= eps, "error2 = %f, \n Rvalue2 = [%f, %f, %f], \n Tvalue2 = [%f, %f, %f]", 
+                    diff2.norm(), V2(0), V2(1), V2(2), RHS2(0), RHS2(1), RHS2(2));
     }
 }
 

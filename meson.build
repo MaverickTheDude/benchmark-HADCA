@@ -10,3 +10,4 @@ executable('main', 'main.cpp', sources : sourcelist)
 
 # tests:
 e = executable('tests', 'tests.cpp', sources : sourcelist)
+test('unitTest', e)

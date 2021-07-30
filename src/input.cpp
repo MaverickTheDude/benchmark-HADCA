@@ -15,7 +15,10 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(_Nbodies_),
     bodyTypes.emplace_back("link");
     alpha0(0) = 0.0;
     alpha0.tail(_Nbodies_ - 1).setConstant(M_PI_4);
-    dalpha0.setZero(); // to do: niezerowa predkosc / ped do testowania funkcji
+    if (Nbodies >= 3) alpha0(2) = M_PI_2;
+    dalpha0(0) = 0.5;
+    dalpha0(1) = 0.2;
+    dalpha0.tail(_Nbodies_-2).setZero();
     setPJointAndSigma();
 }
 
