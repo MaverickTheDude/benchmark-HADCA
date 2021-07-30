@@ -1,6 +1,7 @@
 #include<Eigen/Dense>
 #include<map>
 #include<vector>
+#include<iostream>
 using namespace Eigen;
 
 const double _L_ = 1.0;

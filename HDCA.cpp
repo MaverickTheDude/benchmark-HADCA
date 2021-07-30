@@ -4,7 +4,7 @@ ksi_coefs::ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjo
     /* konstruktor tworzy wsp. ksi dla kazdego assembly odpowiadajacego 
         * fizycznemu czlonowi na poziomie lisci. Note: alphaAbs(alphaJoint) 
         * obliczyne w caller function, pjoint zawiera ZLACZOWE pedy  */
-    const Matrix3d S12 = SAB("s12", id, alphaAbs, input);
+    Matrix3d S12 = SAB("s12", id, alphaAbs, input);
     const Matrix3d S21 = SAB("s21", id, alphaAbs, input);
     const Matrix3d S1C = SAB("s1C", id, alphaAbs, input);
     const Matrix3d S2C = SAB("s2C", id, alphaAbs, input);
@@ -24,23 +24,8 @@ ksi_coefs::ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjo
         rhs10 -= S12*input.pickBodyType(id+1).H*pjoint(id+1);
         rhs20 -= input.pickBodyType(id+1).H*pjoint(id+1);
     }
-    i10 = M1.ldlt().solve(rhs10);
+    i10 = M1.partialPivLu().solve(rhs10);
     i20 = M2.ldlt().solve(rhs20);
-
-// to samo, co powyzej, tyko zapisane na raz (to delete later)
-    /* 
-    if (id == input.Nbodies-1) {
-        i10 = M1.ldlt().solve(      input.pickBodyType(id).H * pjoint(id));
-        i20 = M2.ldlt().solve(S21 * input.pickBodyType(id).H * pjoint(id));
-    }
-    else {
-        i10 = M1.ldlt().solve(input.pickBodyType(id  ).H * pjoint(id   ) -
-                        S12 * input.pickBodyType(id+1).H * pjoint(id+1));
-
-        i10 = M2.ldlt().solve(S21 * input.pickBodyType(id  ).H * pjoint(id   ) -
-                                    input.pickBodyType(id+1).H * pjoint(id+1));
-    } 
-    */
 }
 
 ksi_coefs::ksi_coefs(const ksi_coefs& ksiA, const ksi_coefs& ksiB) {

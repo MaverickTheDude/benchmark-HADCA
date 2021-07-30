@@ -8,7 +8,10 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(_Nbodies_),
     bodyTypes.emplace_back("link");
     alpha0(0) = 0.0;
     alpha0.tail(_Nbodies_ - 1).setConstant(M_PI_4);
-    dalpha0.setZero(); // to do: niezerowa predkosc / ped do testowania funkcji
+    if (Nbodies >= 3) alpha0(2) = M_PI_2;
+    dalpha0(0) = 0.5;
+    dalpha0(1) = 0.2;
+    dalpha0.tail(_Nbodies_-2).setZero();
     setPJointAndSigma();
 }
 
@@ -32,7 +35,7 @@ void  _input_::setPJointAndSigma(void)
         const MatrixXd H1T = pickBodyType(bodyId).H.transpose();
         const MatrixXd D1T = pickBodyType(bodyId).D.transpose();
 
-        PP = M1 * V1 + S12 * PP;
+        PP /*P1A*/ = M1 * V1 + S12 * PP /*P1B*/;
         pjoint0.segment(bodyId, 1) = H1T * PP;
         sigma0.segment(2 * bodyId + 0, 2) = D1T * PP;
     }
