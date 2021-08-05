@@ -3,6 +3,7 @@
 #include "include/assembly.h"
 #include "Eigen/Dense"
 
+#include <fstream>
 #include <iostream>
 
 using namespace Eigen;
@@ -14,16 +15,25 @@ int main(int argc, char* argv[]) {
     // const int Nbodies = argv[1];
     const int Nbodies = 4;
     _input_ input = _input_(Nbodies);
-    
-    VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
-    Assembly A(0, alphaAbs, input.pjoint0, input);
-    Assembly B(1, alphaAbs, input.pjoint0, input);
-    Assembly C(A, B);
 
-    cout << " ksi: "     << endl << C.ksi.k12() << endl;
-    cout << " Q1Acc: "   << endl << C.Q1Acc << endl;
-    cout << " S12 link " << endl << C.ptrAsmB->S12 << endl;
-    cout << " Q2box  "   << endl << C.ptrAsmA->Q2Art << endl;
+    MatrixXd sol = RK_solver(input);
 
+
+	// DRUKOWANIE WYNIKOW (pamietac o logTotalEnergy() w RK_solver())
+/*
+    IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
+	std::ofstream outFile;
+	outFile.open("../results.txt");
+
+	if (outFile.fail() ) {
+		std::cerr << "nie udalo sie otworzyc pliku.";
+		return 2;
+	}
+
+	outFile << sol.format(exportFmt) << endl;
+
+	outFile.close();
+*/
+    cout << "done" << endl;
     return 0;
 }

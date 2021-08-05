@@ -4,6 +4,8 @@
 #include "../include/utils.h"
 #include "../Eigen/Dense"
 
+#include <iostream>
+
 using namespace Eigen;
 
 ksi_coefs::ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input) {
@@ -27,10 +29,11 @@ ksi_coefs::ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjo
     rhs20 = S21 * input.pickBodyType(id).H * pjoint(id);
     if (id < input.Nbodies-1) {
         // S12 = SAB("s12", id+1, alphaAbs, input); // wtf: tak jest w kodzie porr, co wyglada na spory blad. W Matlabie juz S12 jest S12(i), co zreszta wynika ze wzorow
+        // note - aliasing below should be harmless: https://eigen.tuxfamily.org/dox/group__TopicAliasing.html
         rhs10 -= S12*input.pickBodyType(id+1).H*pjoint(id+1);
         rhs20 -= input.pickBodyType(id+1).H*pjoint(id+1);
     }
-    i10 = M1.partialPivLu().solve(rhs10);
+    i10 = M1.ldlt().solve(rhs10);
     i20 = M2.ldlt().solve(rhs20);
 }
 

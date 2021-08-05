@@ -7,9 +7,16 @@
 using namespace Eigen;
 
 class Assembly {
+    friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input);
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);
     Assembly(Assembly& AsmA, Assembly& AsmB);
+    void connect_base_body();
+    void disassembleAll();
+    Vector3d calculate_V1() const;
+    Vector3d calculate_V2() const;
+    void setAll(const Assembly&);
 
 public: // to do: set private
     const ksi_coefs ksi;

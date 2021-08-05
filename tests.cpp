@@ -238,6 +238,30 @@ void test_SetAssembly(void) {
 }
 
 
+
+void test_solveHDCA(void) {
+/*
+ * Test na podstawie zachowania energii w ukladzie. Dla dluzszych czasow symulacji konieczne jest obnizenie tolerancji.
+ * Prawdopodobnie w pewnej chwili ruchu zachodzi "dziwny" rodzaj ruchu (np. jerk jednego z czlonow) i psuje zachowanie energii
+ * Pass dla: Tk = 2 sek, Nbodies = 4 i Rtol = 6e-4
+ */
+    int Nbodies = 9;
+    _input_ input = _input_(Nbodies);
+    MatrixXd sol = RK_solver(input);
+
+    VectorXd y1 = sol.col(0);
+    VectorXd y2 = sol.col(sol.cols()-1);
+
+    double e1 = calculateTotalEnergy(y1(0), y1.tail(y1.size()-1), input);
+    double e2 = calculateTotalEnergy(y2(0), y2.tail(y2.size()-1), input);
+
+    double Rtol = 1e-5;
+    double diff = abs(e1-e2);
+    TEST_CHECK_(diff <= e1*Rtol, "\ndiff = %f = %f %% \ntol = %f = %f %% (Rtol) \ne1 =  %f \ne2 =  %f \nNbodies = %d", 
+                diff, diff/e1*100, e1*Rtol, Rtol*100, e1, e2, Nbodies);
+}
+
+
 TEST_LIST = {
    { "phi", test_Phi },
    { "jacobian", test_Fq },
@@ -246,5 +270,6 @@ TEST_LIST = {
    { "joint2AbsVelocity (Test 2)", test_jointToAbsoluteVelocity2 },
    { "_input_.setPJointAndSigma", test_SetPJoint },
    { "setAssembly", test_SetAssembly },
+   { "solveHDCA", test_solveHDCA},
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

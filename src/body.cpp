@@ -10,10 +10,10 @@ using namespace Eigen;
 
 body::body(std::string type)
 {
-    m = _m_;
-    J = _J_;
     if (!type.compare("box"))
     {
+        m = _m_box_;
+        J = _J_box_;
         s1C.setZero();
         s12.setZero();
         H << 1, 0, 0;
@@ -21,6 +21,8 @@ body::body(std::string type)
     }
     else if (!type.compare("link"))
     {
+        m = _m_link_;
+        J = _J_link_;
         s1C << _L_ / 2, 0;
         s12 << _L_, 0;
         H << 0, 0, 1;

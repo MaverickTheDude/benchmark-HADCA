@@ -1,25 +1,34 @@
 #include "../include/input.h"
-
 #include "../include/utils.h"
 #include "../Eigen/Dense"
 
-#include <vector>
-
 using namespace Eigen;
 
-_input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(_Nbodies_),
-                                  dalpha0(_Nbodies_), pjoint0(_Nbodies_),
-                                  sigma0(2 * _Nbodies_)
+#include <iostream>
+
+#define SIMULATION_TIME 1.0
+#define TIME_STEP 0.01
+
+_input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
+                                  dalpha0(Nbodies),   pjoint0(Nbodies),
+                                  sigma0(2 * Nbodies),
+                                  Tk(SIMULATION_TIME), dt(TIME_STEP), Nsamples(Tk/dt+1),
+                                  Ntiers(ceil(log2(Nbodies))+1)
 {
     bodyTypes.emplace_back("box");
     bodyTypes.emplace_back("link");
     alpha0(0) = 0.0;
-    alpha0.tail(_Nbodies_ - 1).setConstant(M_PI_4);
-    if (Nbodies >= 3) alpha0(2) = M_PI_2;
-    dalpha0(0) = 0.5;
-    dalpha0(1) = 0.2;
-    dalpha0.tail(_Nbodies_-2).setZero();
+    alpha0(1) = M_PI_4;
+    alpha0.tail(Nbodies - 2).setConstant(0);
+    dalpha0.setZero();
     setPJointAndSigma();
+    
+    int Ntmp = Nbodies;
+	tiersInfo = new int[Ntiers];
+	for (int i = 0; i < Ntiers; i++){
+		tiersInfo[i] = Ntmp;
+		Ntmp = static_cast<int>( ceil(static_cast<double>(Ntmp) / 2.0) );
+	}
 }
 
 void  _input_::setPJointAndSigma(void)
@@ -48,4 +57,8 @@ void  _input_::setPJointAndSigma(void)
     }
 
     return;
+}
+
+_input_::~_input_() {
+	delete [] tiersInfo;
 }

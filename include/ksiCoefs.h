@@ -7,6 +7,7 @@ using namespace Eigen;
 
 class ksi_coefs {
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);
     ksi_coefs(const ksi_coefs& ksiA, const ksi_coefs& ksiB);
 
