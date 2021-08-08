@@ -247,13 +247,19 @@ void test_solveHDCA(void) {
  */
     int Nbodies = 9;
     _input_ input = _input_(Nbodies);
-    MatrixXd sol = RK_solver(input);
+    _solution_ sol = RK_solver(input);
 
-    VectorXd y1 = sol.col(0);
-    VectorXd y2 = sol.col(sol.cols()-1);
+	VectorXd y1(2*Nbodies);
+    VectorXd y2(2*Nbodies);
+    y1.head(Nbodies) = sol.pjoint.col(0);
+    y1.tail(Nbodies) = sol.alpha.col(0);
 
-    double e1 = calculateTotalEnergy(y1(0), y1.tail(y1.size()-1), input);
-    double e2 = calculateTotalEnergy(y2(0), y2.tail(y2.size()-1), input);
+    y2.head(Nbodies) = sol.pjoint.col(input.Nsamples-1);
+    y2.tail(Nbodies) = sol.alpha.col(input.Nsamples-1);
+
+
+    double e1 = calculateTotalEnergy(0,        y1, input);
+    double e2 = calculateTotalEnergy(input.Tk, y2, input);
 
     double Rtol = 1e-5;
     double diff = abs(e1-e2);

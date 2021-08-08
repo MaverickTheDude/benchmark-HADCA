@@ -1,11 +1,11 @@
 #include "include/input.h"
 #include "include/utils.h"
 #include "include/assembly.h"
+#include "include/solution.h"
 #include "Eigen/Dense"
+#include <time.h>
 
-#include <fstream>
 #include <iostream>
-
 using namespace Eigen;
 using std::cout;
 using std::endl;
@@ -16,24 +16,19 @@ int main(int argc, char* argv[]) {
     const int Nbodies = 4;
     _input_ input = _input_(Nbodies);
 
-    MatrixXd sol = RK_solver(input);
+    _solution_ sol = RK_solver(input);
 
+	sol.print();
 
-	// DRUKOWANIE WYNIKOW (pamietac o logTotalEnergy() w RK_solver())
-/*
-    IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
-	std::ofstream outFile;
-	outFile.open("../results.txt");
-
-	if (outFile.fail() ) {
-		std::cerr << "nie udalo sie otworzyc pliku.";
-		return 2;
-	}
-
-	outFile << sol.format(exportFmt) << endl;
-
-	outFile.close();
-*/
     cout << "done" << endl;
     return 0;
 }
+
+	// clock_t start, end;
+	// double time;
+	// start = clock();
+	// for (int i = 0; i < 9999; i++)
+	// 	atTime(0.01, T);
+	// end = clock();
+	// time = double(end - start) / double(CLOCKS_PER_SEC);
+	// cout << time << endl;

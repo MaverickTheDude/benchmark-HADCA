@@ -7,7 +7,9 @@ sourcelist = ['src/assembly.cpp',
     'src/input.cpp',
     'src/ksiCoefs.cpp',
     'src/utils.cpp',
-    'src/RHS.cpp' ]
+    'src/RHS.cpp',
+    'src/solution.cpp'
+     ]
 executable('main', 'main.cpp', sources : sourcelist)
 
 # tests:

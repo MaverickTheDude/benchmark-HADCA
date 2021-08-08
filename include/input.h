@@ -27,6 +27,7 @@ public:
     const double Tk, dt;
     const int Nsamples, Ntiers;
     int* tiersInfo;
+    const bool logEnergy;
 
 private:
     void setPJointAndSigma(void);

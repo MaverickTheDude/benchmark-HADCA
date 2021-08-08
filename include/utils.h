@@ -2,6 +2,7 @@
 
 #include "../Eigen/Dense"
 #include "input.h"
+#include "../include/solution.h"
 
 using namespace Eigen;
 
@@ -14,6 +15,7 @@ Matrix3d dSAB(const std::string& _sAB_, const int id, const VectorXd& alphaAbs, 
 VectorXd joint2AbsAngles(const VectorXd& alpha);
 Matrix3d massMatrix(const int id, const _input_& input);
 Vector3d Q1_init(int id, const VectorXd& alphaAbs, const _input_& input);
-MatrixXd RK_solver(const _input_& input);
+_solution_ RK_solver(const _input_& input);
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input);
+VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution);
 double calculateTotalEnergy(const double& t, const VectorXd &y, const _input_ &input);

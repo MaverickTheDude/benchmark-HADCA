@@ -2,10 +2,16 @@
 #include "../include/input.h"
 #include "../Eigen/Dense"
 #include "../include/assembly.h"
+#include "../include/solution.h"
     #include <iostream>
 using std::vector;
 
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input) {
+    _solution_ solution;
+    return RHS_HDCA(t, y, input, solution);
+}
+
+VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
 	const unsigned int n = y.size()/2;
     VectorXd pjoint = y.head(n);
     VectorXd alpha  = y.tail(n);
@@ -107,5 +113,17 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input) {
     VectorXd dy(y.size());
     dy.head(n) = dpjoint;
     dy.tail(n) = dalpha;
+
+    if (solution.dummySolution())
+        return dy;
+    
+    int index = solution.atTime(t);
+    solution.setAlpha(index, alpha);
+    solution.setDalpha(index, dalpha);
+    solution.setPjoint(index, pjoint);
+
+
+    /* acceleration analysis */
+    
     return dy;
 }

@@ -135,34 +135,33 @@ Vector3d Q1_init(int id, const VectorXd &alphaAbs, const _input_ &input)
 }
 
 static void logTotalEnergy(const double& t, const VectorXd &y, const _input_ &input);
-MatrixXd RK_solver(const _input_ &input) {
+_solution_ RK_solver(const _input_ &input) {
 	const double dt = input.dt;
 	const double Tk = input.Tk;
 	const int Nbodies = input.Nbodies;
-	const unsigned int n = input.alpha0.size();
-    MatrixXd solution(2*Nbodies+1, input.Nsamples);
+    _solution_ solution(input); // pytanie: czy przy wyjsciu z funkcji solution zostanie przekopiowane, czy obiekt pozostanie w pamieci a funkcjia zwroci referencje?
 
 	VectorXd T = VectorXd::LinSpaced(input.Nsamples, 0, Tk);
-	VectorXd y_m1(2*n);
-	y_m1.head(n) = input.pjoint0;
-	y_m1.tail(n) = input.alpha0;
-    solution.row(0) = T;
-    solution.block(1, 0, 2*Nbodies, 1) = y_m1;
+    solution.setT(T);
+	VectorXd y_m1(2*Nbodies);
+	y_m1.head(Nbodies) = input.pjoint0;
+	y_m1.tail(Nbodies) = input.alpha0;
 
 //	double t = omp_get_wtime(); //tic
 	for (int i = 1; i < input.Nsamples; i++) {
         const double t = T(i-1);
-		VectorXd k1 = RHS_HDCA(t         , y_m1,               input);
+		VectorXd k1 = RHS_HDCA(t         , y_m1,               input, solution); //RHS_HDCA appends the solution at i-1
         VectorXd k2 = RHS_HDCA(t + dt/2.0, y_m1 + dt/2.0 * k1, input);
 		VectorXd k3 = RHS_HDCA(t + dt/2.0, y_m1 + dt/2.0 * k2, input);
 		VectorXd k4 = RHS_HDCA(t + dt,     y_m1 + dt     * k3, input);
 
 		VectorXd y = y_m1 +  dt/6 * (k1 + 2*k2 + 2*k3 + k4);
-        solution.block(1, i, 2*Nbodies, 1) = y;
 		y_m1 = y;
 
-        // logTotalEnergy(t, y, input);
+        if (input.logEnergy)
+            logTotalEnergy(t, y, input);
 	}
+    RHS_HDCA(input.Tk, y_m1, input, solution); // save last entry
 //	t =  omp_get_wtime() - t; //toc
 //	std::cout << "calkowity czas: " << t << std::endl << std::endl;
 
@@ -201,7 +200,7 @@ static void logTotalEnergy(const double& t, const VectorXd &y, const _input_ &in
     static bool cleanFile = true;
     if (cleanFile) {
         std::ofstream outFile;
-        outFile.open("../results.txt");
+        outFile.open("../output/energy.txt");
         outFile << "";
         outFile.close();
         cleanFile = false;
@@ -210,7 +209,7 @@ static void logTotalEnergy(const double& t, const VectorXd &y, const _input_ &in
     double energy = calculateTotalEnergy(t, y, input);
 
 	std::ofstream outFile;
-	outFile.open("../results.txt", std::ios_base::app);
+	outFile.open("../output/energy.txt", std::ios_base::app);
 
 	if (outFile.fail() ) {
 		std::cerr << "nie udalo sie otworzyc pliku.";
