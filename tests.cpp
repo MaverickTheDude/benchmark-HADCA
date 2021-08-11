@@ -29,11 +29,11 @@ static const double eps = 1e-7;
 using namespace Eigen;
 
 void test_Phi(void) {
-    _input_ input = _input_(2);
-    VectorXd q(6);
+    _input_ input = _input_(10);
+    VectorXd q(30);
     q = jointToAbsolutePosition(input.alpha0, input);
 
-    Vector4d phi  = Phi(q, input);
+    VectorXd phi  = Phi(q, input);
 
     TEST_CHECK_(phi.norm() <= eps, "max error = %f", phi.norm());
 }
@@ -47,8 +47,8 @@ void test_Phi(void) {
 using namespace Eigen;
 
 void test_Fq(void) {
-    _input_ input = _input_(2);
-    VectorXd q(6);
+    _input_ input = _input_(10);
+    VectorXd q(30);
     q = jointToAbsolutePosition(input.alpha0, input);
 
     MatrixXd fd   = jacobianReal(Phi, q, input);

@@ -12,7 +12,6 @@ using std::endl;
 
 
 int main(int argc, char* argv[]) {
-    // const int Nbodies = argv[1];
     const int Nbodies = 4;
     _input_ input = _input_(Nbodies);
 
