@@ -18,6 +18,7 @@ body::body(std::string type)
         s12.setZero();
         H << 1, 0, 0;
         D << 0, 0, 1, 0, 0, 1;
+        jointType = body::JOINT_TYPE::PRISMATIC;
     }
     else if (!type.compare("link"))
     {
@@ -27,6 +28,7 @@ body::body(std::string type)
         s12 << _L_, 0;
         H << 0, 0, 1;
         D << 1, 0, 0, 1, 0, 0;
+        jointType = body::JOINT_TYPE::REVOLUTE;
     }
     else
         throw std::runtime_error("not supported body / joint");
