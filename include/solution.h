@@ -4,6 +4,17 @@
 
 using namespace Eigen;
 
+struct dataJoint {
+    dataJoint(int n) : alpha(n), dalpha(n), d2alpha(n), lambda(2*n), pjoint(n) { }
+
+    double t;
+    VectorXd alpha;
+    VectorXd dalpha;
+    VectorXd d2alpha;
+    VectorXd lambda;
+    VectorXd pjoint;
+};
+
 class _solution_{
 public:
     _solution_(const _input_& input) : T(input.Nsamples), 
@@ -17,6 +28,9 @@ public:
     _solution_() : flag(dummy) { /* dummy structure to be passed as an argument in RHS_HDCA */ }
     enum flags {active, dummy};
     int atTime(const double& t);
+    int atTimeRev(const double& tau);
+    dataJoint getDynamicValuesRev(const double& tau);
+
 
     void setT(VectorXd _T_) {T = _T_;}
     void setAlpha(  int ind, VectorXd _alpha_)   { alpha.col(ind)   = _alpha_  ; }

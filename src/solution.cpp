@@ -24,6 +24,25 @@ int _solution_::atTime(const double& t) {
 	throw std::runtime_error("inex not found");
 }
 
+int _solution_::atTimeRev(const double& tau) {
+	const double Tk = T(T.size()-1);
+	const double t = Tk - tau;
+	return atTime(t);
+}
+
+dataJoint _solution_::getDynamicValuesRev(const double& tau) {
+	const int Nvars = alpha.rows();
+	dataJoint data = dataJoint(Nvars);
+	const int t_ind = atTimeRev(tau);
+	data.alpha   = alpha.col(t_ind);
+	data.dalpha  = dalpha.col(t_ind);
+	data.d2alpha = d2alpha.col(t_ind);
+	data.lambda  = lambda.col(t_ind);
+	data.pjoint  = pjoint.col(t_ind);
+
+	return data;
+}
+
 void _solution_::print() const {
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
 	std::ofstream outFile;
@@ -37,7 +56,7 @@ void _solution_::print() const {
 	MatrixXd sol(2*n+1, N);
 
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = pjoint;
+	sol.block(1, 0, n, N) = d2alpha;
 	sol.block(1+n, 0, n, N) = alpha;
 
 	outFile << sol;

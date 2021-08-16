@@ -6,6 +6,8 @@
 using namespace Eigen;
 
 class ksi_coefs {
+	// friend void Assembly::setKsiAcc(const int id, const VectorXd& alphaAbs, const MatrixXd& P1art, const _input_& input); doesn't work
+	friend class Assembly;
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);

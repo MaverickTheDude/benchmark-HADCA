@@ -11,6 +11,10 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input) {
     return RHS_HDCA(t, y, input, solution);
 }
 
+VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
+     // to do, to rethink
+}
+
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
 	const unsigned int n = y.size()/2;
     VectorXd pjoint = y.head(n);
@@ -33,18 +37,19 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
 
     for (int i = 1; i < input.Ntiers; i++) {
         vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];
+        vector<Assembly, aligned_allocator<Assembly> >& upperBranch = tree[i-1];
         branch.reserve(input.tiersInfo[i]);
         const int endOfBranch = input.tiersInfo[i-1] - 1;
 
 // TODO: parallelize
         /* core loop of HDCA algorithm */
         for (int j = 0; j < endOfBranch; j+=2) {
-            branch.emplace_back(tree[i-1][j], tree[i-1][j+1]);
+            branch.emplace_back(upperBranch[j], upperBranch[j+1]);
         }
         
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1)
-			branch.emplace_back(tree[i-1].back()); // fixme: konstruktor kopiujacy ?
+			branch.emplace_back(upperBranch.back()); // fixme: konstruktor kopiujacy ?
     }
     
     /* base body connection */
@@ -69,10 +74,11 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
 	}
 
     /* velocity calculation */
-    MatrixXd P1art(3, input.Nbodies);
-    Vector3d H = input.pickBodyType(0).H;
-	dalpha(0) = H.transpose() * leafBodies[0].calculate_V1();
-	P1art.col(0) = leafBodies[0].T1 + H*pjoint(0);
+    MatrixXd P1art(3, input.Nbodies+1);
+    const Vector3d Hground = input.pickBodyType(0).H;
+	dalpha(0) = Hground.transpose() * leafBodies[0].calculate_V1();
+	P1art.col(0) = leafBodies[0].T1 + Hground*pjoint(0);
+    P1art.col(input.Nbodies).setZero();
 
 // TODO: parallelize
 	for (int i = 1; i < input.tiersInfo[0]; i++) {
@@ -104,12 +110,6 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
 		dpjoint(i) = H.transpose() * (des.col(i) + leafBodies[i].Q1Art + dS1c*P1art.col(i) );
 	}
 
-    // std::cout << "des = " << std::endl << des << std::endl;
-    // std::cout << "dalpha0 = " << std::endl << input.dalpha0 << std::endl;
-    // std::cout << "dalpha = " << std::endl << dalpha << std::endl;
-    // std::cout << "Part = " << std::endl << P1art << std::endl;
-    // std::cout << "dp = " << std::endl << dpjoint << std::endl;
-
     VectorXd dy(y.size());
     dy.head(n) = dpjoint;
     dy.tail(n) = dalpha;
@@ -121,9 +121,71 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
     solution.setAlpha(index, alpha);
     solution.setDalpha(index, dalpha);
     solution.setPjoint(index, pjoint);
+    VectorXd d2alpha(n);
+    VectorXd lambda(input.Nconstr);
 
 
     /* acceleration analysis */
+// TODO: Parallelize
+    for (int i = 0; i < input.Nbodies; i++)
+        leafBodies[i].setKsiAcc(i, alphaAbs, dAlphaAbs, P1art, input);
+        
+
+    for (int i = 1; i < input.Ntiers; i++) {
+        vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];
+        vector<Assembly, aligned_allocator<Assembly> >& upperBranch = tree[i-1];
+        const int endOfBranch = input.tiersInfo[i-1] - 1;
+        int index = 0;
+
+// TODO: parallelize
+        /* core loop of HDCA algorithm */
+        for (int j = 0; j < endOfBranch; j+=2) {
+            branch[index].assembleAcc(upperBranch[j], upperBranch[j+1]);
+            ++index;
+        }
+        
+        /* case: odd # elements */
+		if (input.tiersInfo[i-1] % 2 == 1)
+			branch[index].assembleAcc(upperBranch.back());
+    }
+
+
+    /* base body connection */
+    AssemblyS.connect_base_bodyAcc();
+	AssemblyS.disassembleAcc();
+
+	for (int i = prelastTier; i > 0; i--) {
+		const int end_of_branch = input.tiersInfo[i-1] % 2 == 0 ?
+				input.tiersInfo[i] : input.tiersInfo[i]-1;
+
+// TODO: parallelize
+		for (int j = 0; j < end_of_branch; j++) {
+			tree[i].at(j).disassembleAcc();
+		}
+
+        /* case: odd # elements */
+		if (input.tiersInfo[i-1] % 2 == 1) {
+			tree[i-1].back().setAcc(tree[i].back());
+		}
+	}
+
+    /* joint acceleration calculation */
+    const Matrix<double, 3,2> Dground = input.pickBodyType(0).D;
+	d2alpha(0) = Hground.transpose() * leafBodies[0].calculate_dV1();
+    lambda.segment(0,2) = Dground.transpose() * leafBodies[0].L1;
+
+// TODO: parallelize
+	for (int i = 1; i < input.tiersInfo[0]; i++) {
+        const Vector3d H = input.pickBodyType(i).H;
+        const Matrix<double, 3,2> D = input.pickBodyType(i).D;
+		const Vector3d dV1B = leafBodies[i].calculate_dV1();
+		const Vector3d dV2A = leafBodies[i-1].calculate_dV2();
+		d2alpha(i) = H.transpose() * (dV1B - dV2A);
+        lambda.segment(2*i, 2) = D.transpose() * leafBodies[0].L1;
+	}
+    solution.setD2alpha(index, d2alpha);
+    solution.setLambda( index, lambda);
+    
     
     return dy;
 }

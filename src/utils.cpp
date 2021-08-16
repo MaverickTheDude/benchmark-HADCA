@@ -86,6 +86,53 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
     return dq;
 }
 
+// struct coordinates {
+
+// }
+
+MatrixXd jointToAbsoluteCoords(const VectorXd &alpha, const VectorXd &dalpha, 
+                               const VectorXd &d2alpha, const _input_ &input)
+{
+    /**
+     * Converts joint alpha, dalpha, and d2alpha to their absolute counterparts [q, dq, d2q].
+     * note: 1) the caller function can use: const VectorXd& q = x.col(0);
+     *       2) alphaAbs and derivatives can be obtained from slicing
+     */
+    enum place {q, v, a};
+    MatrixXd x(3 * input.Nbodies, 3);
+    VectorXd alphaAbsolute(input.Nbodies);
+    x.block(0, 0, 6, 3) << alpha(0), dalpha(0), d2alpha(0), 
+                                0.0,       0.0,       0.0, 
+                                0.0,       0.0,       0.0,
+                            alpha(0), dalpha(0), d2alpha(0),
+                                0.0,       0.0,       0.0,
+                            alpha(1), dalpha(1), d2alpha(1);
+
+    alphaAbsolute.segment(0, 2) << alpha(0), alpha(1);
+
+// zrownoleglamy wszystkie obliczenia na raz
+    for (int i = 2; i < input.Nbodies; i++)
+    {
+        const int prev = i - 1;
+        const double phi = x(3*prev + 2, q);
+        const double om  = x(3*prev + 2, v);
+        const double eps = x(3*prev + 2, a);
+        const Vector2d& s12 = input.pickBodyType(prev).s12;
+
+        x.block(3*i, q, 2, 1) = x.block(3*prev, q, 2, 1) +  Rot(phi) * s12;
+        x(3*i + 2, q) = phi + alpha(i);
+
+
+        x.block(3*i, v, 2, 1) = x.block(3*prev, v, 2, 1) +  Om*Rot(phi) * om * s12;
+        x(3*i + 2, v) = om + dalpha(i);
+
+        x.block(3*i, a, 2, 1) = x.block(3*prev, a, 2, 1) +  (Om*Rot(phi) * eps - Rot(phi) * om*om) * s12;
+        x(3*i + 2, a) = eps + d2alpha(i);
+    }
+
+    return x;
+}
+
 /* opcje dla vec : {s12, s21, s1C, s2C} */
 Matrix3d SAB(const std::string &_sAB_, const int id, const VectorXd &alphaAbs, const _input_ &input)
 {
@@ -134,41 +181,7 @@ Vector3d Q1_init(int id, const VectorXd &alphaAbs, const _input_ &input)
     return Q_out;
 }
 
-static void logTotalEnergy(const double& t, const VectorXd &y, const _input_ &input);
-_solution_ RK_solver(const _input_ &input) {
-	const double dt = input.dt;
-	const double Tk = input.Tk;
-	const int Nbodies = input.Nbodies;
-    _solution_ solution(input); // pytanie: czy przy wyjsciu z funkcji solution zostanie przekopiowane, czy obiekt pozostanie w pamieci a funkcjia zwroci referencje?
-
-	VectorXd T = VectorXd::LinSpaced(input.Nsamples, 0, Tk);
-    solution.setT(T);
-	VectorXd y_m1(2*Nbodies);
-	y_m1.head(Nbodies) = input.pjoint0;
-	y_m1.tail(Nbodies) = input.alpha0;
-
-//	double t = omp_get_wtime(); //tic
-	for (int i = 1; i < input.Nsamples; i++) {
-        const double t = T(i-1);
-		VectorXd k1 = RHS_HDCA(t         , y_m1,               input, solution); //RHS_HDCA appends the solution at i-1
-        VectorXd k2 = RHS_HDCA(t + dt/2.0, y_m1 + dt/2.0 * k1, input);
-		VectorXd k3 = RHS_HDCA(t + dt/2.0, y_m1 + dt/2.0 * k2, input);
-		VectorXd k4 = RHS_HDCA(t + dt,     y_m1 + dt     * k3, input);
-
-		VectorXd y = y_m1 +  dt/6 * (k1 + 2*k2 + 2*k3 + k4);
-		y_m1 = y;
-
-        if (input.logEnergy)
-            logTotalEnergy(t, y, input);
-	}
-    RHS_HDCA(input.Tk, y_m1, input, solution); // save last entry
-//	t =  omp_get_wtime() - t; //toc
-//	std::cout << "calkowity czas: " << t << std::endl << std::endl;
-
-	return solution;
-};
-
-double calculateTotalEnergy(const double& t, const VectorXd &y, const _input_ &input) {
+double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
     const unsigned int n = input.alpha0.size();
     VectorXd dy = RHS_HDCA(t , y, input);
     VectorXd alpha  = y.tail(n);
@@ -193,9 +206,9 @@ double calculateTotalEnergy(const double& t, const VectorXd &y, const _input_ &i
     return energy;
 }
 
-static void logTotalEnergy(const double& t, const VectorXd &y, const _input_ &input) {
+void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
     /*  
-     * Funkcjia oblicza calkowita energie w ukladzie i sluzy do testowania obliczen.
+     * Funkcjia loguje calkowita energie w ukladzie i sluzy do testowania obliczen.
      * */
     static bool cleanFile = true;
     if (cleanFile) {
