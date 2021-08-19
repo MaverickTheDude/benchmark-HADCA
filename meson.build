@@ -12,6 +12,8 @@ sourcelist = ['src/assembly.cpp',
     'src/task/Phi.cpp',
     'src/RHS.cpp',
     'src/solution.cpp',
+    'src/task/M.cpp',
+    'src/adjoint.cpp',
     'src/solvers.cpp']
 executable('main', 'main.cpp', sources : sourcelist)
 

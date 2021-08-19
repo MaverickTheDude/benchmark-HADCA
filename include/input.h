@@ -3,7 +3,7 @@
 #include "body.h"
 #include "../Eigen/Dense"
 
-#include <Eigen/StdVector>
+#include "../Eigen/StdVector"
 
 using namespace Eigen;
 
