@@ -19,6 +19,8 @@ Matrix3d massMatrix(const int id, const _input_& input);
 Vector3d Q1_init(int id, const VectorXd& alphaAbs, const _input_& input);
 double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& input);
 void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input);
+dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _input_& input);
+dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input);
 
 // solvers.cpp
 _solution_ RK_solver(const _input_& input);
@@ -27,3 +29,4 @@ VectorXd RK_AdjointSolver(const _input_& input, _solution_& solution);
 // RHS.cpp
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input);
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution);
+VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _solution_& solutionFwd, const _input_& input);

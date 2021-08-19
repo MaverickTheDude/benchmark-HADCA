@@ -1,11 +1,17 @@
 #pragma once
 #include "../Eigen/Dense"
 #include "../include/input.h"
+#include <iostream>
 
 using namespace Eigen;
 
 struct dataJoint {
     dataJoint(int n) : alpha(n), dalpha(n), d2alpha(n), lambda(2*n), pjoint(n) { }
+
+    dataJoint() = default;
+    dataJoint(const dataJoint& o) = default; // copy Ctor
+    dataJoint(dataJoint&& o)      = default; // move Ctro
+    ~dataJoint() { }
 
     double t;
     VectorXd alpha;
@@ -24,13 +30,26 @@ public:
                                      lambda(input.Nconstr, input.Nsamples),
                                      pjoint(input.Nbodies, input.Nsamples), 
                                      flag(active)
-    {    }
-    _solution_() : flag(dummy) { /* dummy structure to be passed as an argument in RHS_HDCA */ }
-    enum flags {active, dummy};
-    int atTime(const double& t);
-    int atTimeRev(const double& tau);
-    dataJoint getDynamicValuesRev(const double& tau);
+    {   }
+    _solution_() : flag(dummy) { 
+    /* dummy structure to be passed as an argument in RHS_HDCA */
+        //std::cout<<this<<'\t'<<"Ctor\n"; 
+    }
 
+    // https://coders-corner.net/2018/02/18/fast-way-to-return-a-large-object/
+    // https://stackoverflow.com/a/27916892/4283100
+    // copy elison: ponizsze konstruktory nie sa wywolywane, ale gwarantuja poprawna prace. 
+    // W przypadku wywolania, prawdopodobnie RVO nie zadzialalo. (note: RVO dziala na poziomie -O0, czy to ok ?)
+  _solution_(const _solution_& o) : T(o.T), alpha(o.alpha), dalpha(o.dalpha), d2alpha(o.d2alpha), lambda(o.lambda), pjoint(o.pjoint), flag(o.flag)
+    { std::cout<<this<<'\t'<<"CCtor\n"; }
+  _solution_(_solution_&& o)      : T(o.T), alpha(o.alpha), dalpha(o.dalpha), d2alpha(o.d2alpha), lambda(o.lambda), pjoint(o.pjoint), flag(o.flag)
+    { std::cout<<this<<'\t'<<"MCtor\n"; }
+  ~_solution_() 
+    {  /* std::cout<<this<<'\t'<<"Dtor\n"; */  }
+
+    enum flags {active, dummy};
+    std::pair<int, const bool> atTime(const double& t, const _input_& input) const;
+    dataJoint getDynamicValues(const int index, const _input_& input) const;
 
     void setT(VectorXd _T_) {T = _T_;}
     void setAlpha(  int ind, VectorXd _alpha_)   { alpha.col(ind)   = _alpha_  ; }

@@ -11,8 +11,20 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input) {
     return RHS_HDCA(t, y, input, solution);
 }
 
-VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
-     // to do, to rethink
+VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _solution_& solutionFwd, const _input_& input) {
+    const unsigned int n = y.size()/2;
+    VectorXd e = y.head(n);
+    VectorXd c = y.tail(n);
+    dataJoint state = interpolate(t, solutionFwd, input);
+    VectorXd de(n);
+
+// e,c to eta,xi
+// ??? q, dq, d2q, lambda, ! u
+
+    VectorXd dy(2*n);
+    dy.head(n) = de;
+    dy.tail(n) = -e; // == dc
+    return dy;
 }
 
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
@@ -20,8 +32,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
     VectorXd pjoint = y.head(n);
     VectorXd alpha  = y.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
-    VectorXd dalpha(n);
-    VectorXd dpjoint(n);
+    VectorXd dalpha(n), dpjoint(n);
 
     // vector<vector<Assembly>> tree;
     vector<vector<Assembly, aligned_allocator<Assembly> >, aligned_allocator<Assembly> > tree;
@@ -117,7 +128,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
     if (solution.dummySolution())
         return dy;
     
-    int index = solution.atTime(t);
+    const int index = solution.atTime(t, input).first;
     solution.setAlpha(index, alpha);
     solution.setDalpha(index, dalpha);
     solution.setPjoint(index, pjoint);
@@ -135,18 +146,18 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
         vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];
         vector<Assembly, aligned_allocator<Assembly> >& upperBranch = tree[i-1];
         const int endOfBranch = input.tiersInfo[i-1] - 1;
-        int index = 0;
+        int branchIndex = 0;
 
 // TODO: parallelize
         /* core loop of HDCA algorithm */
         for (int j = 0; j < endOfBranch; j+=2) {
-            branch[index].assembleAcc(upperBranch[j], upperBranch[j+1]);
-            ++index;
+            branch[branchIndex].assembleAcc(upperBranch[j], upperBranch[j+1]);
+            ++branchIndex;
         }
         
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1)
-			branch[index].assembleAcc(upperBranch.back());
+			branch[branchIndex].assembleAcc(upperBranch.back());
     }
 
 

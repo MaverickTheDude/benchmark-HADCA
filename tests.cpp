@@ -268,6 +268,117 @@ void test_solveHDCA(void) {
 }
 
 
+void test_atTime(void) {
+    const int eps = 1e-10;
+    const int Nbodies = 5;
+    _input_ input = _input_(Nbodies);
+    _solution_ sol = RK_solver(input);
+    const double& dt = input.dt;
+
+    double t_tab[] = {dt, 2*dt     , 0.33     , 0.5      , 0.69     , input.Tk-dt    , input.Tk,
+                 dt+dt/2, 2*dt+dt/2, 0.33+dt/2, 0.51+dt/2, 0.71+dt/2, input.Tk-3*dt/2, input.Tk-dt/2};
+    const int size = 14;
+
+    for (int i = 0; i < size; i++) {
+        double t = t_tab[i], t_test;
+        std::pair<int,bool> indStruct = sol.atTime(t, input);
+        int ind = indStruct.first;
+        if (indStruct.second == true) // node value
+            t_test = sol.T(ind);
+        else 
+            t_test = sol.T(ind) + input.dt/2;
+
+        const double diff = t - t_test;
+        TEST_CHECK_(diff <= eps, "\ndiff = %f\t t = %f, \t ind = %d, \t t_test = %f\n",
+                    diff, t, ind, t_test);
+    }
+}
+
+void test_interpolate(void) {
+    /* 
+     * test interpolacji wielomianem 3. stopnia parametrow kinematycznych.
+     * Sprawdzamy czy obliczona wartosc (c) znajduje sie w przedziale miedzy wartosciami brzegowymi [a,b]
+     * note: test moze nie przejsc jesli trafimy na eskremum lokalne, np. dla t=0.33, alpha(3)
+     * dla t=0.85, d2alpha(4) niezle widac przewage interpolacji wzgledem opcji liniowej (test oczywiscie failed)  */
+    const int Nbodies = 5;
+    _input_ input = _input_(Nbodies);
+    _solution_ sol = RK_solver(input);
+    const double& dt = input.dt;
+	
+    for (double t : {0.0, dt, 0.34, 0.57, input.Tk-2*dt, input.Tk-dt}) {
+
+        auto ind1 = sol.atTime(t, input);
+        auto ind2 = sol.atTime(t+dt, input);
+        dataJoint s1 = sol.getDynamicValues(ind1.first, input);
+        dataJoint s2 = sol.getDynamicValues(ind2.first, input);
+        dataJoint sI = interpolate(t+dt/2, sol, input);
+        dataJoint sL = interpolateLinear(t+dt/2, sol, input);
+
+
+        for (int i = 0; i < Nbodies; i++) {
+            double& a  = s1.alpha(i);
+            double& c  = sI.alpha(i);
+            double& cL = sL.alpha(i);
+            double& b  = s2.alpha(i);
+            int sign = (b > a) ? 1 : -1;
+
+            TEST_CHECK_(sign*(c - a) > 0, "alpha(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            TEST_CHECK_(sign*(c - b) < 0, "alpha(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            a  = s1.dalpha(i);
+            c  = sI.dalpha(i);
+            cL = sL.dalpha(i);
+            b  = s2.dalpha(i);
+            sign = (b > a) ? 1 : -1;
+
+            TEST_CHECK_(sign*(c - a) > 0, "dalpha(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            TEST_CHECK_(sign*(c - b) < 0, "dalpha(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            a  = s1.d2alpha(i);
+            c  = sI.d2alpha(i);
+            cL = sL.d2alpha(i);
+            b  = s2.d2alpha(i);
+            sign = (b > a) ? 1 : -1;
+
+            const bool specialCase_d2a_ekstremum = abs(t-0.98)<1e-5 && i == 4;
+        if ( !specialCase_d2a_ekstremum )
+            TEST_CHECK_(sign*(c - a) > 0, "d2alpha(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            TEST_CHECK_(sign*(c - b) < 0, "d2alpha(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                  i,        t,                    a,      c,      cL,           b);
+            a  = s1.lambda(2*i);
+            c  = sI.lambda(2*i);
+            cL = sL.lambda(2*i);
+            b  = s2.lambda(2*i);
+            sign = (b > a) ? 1 : -1;
+
+            if (abs(a) < eps && abs(b) < eps)
+                continue;
+
+            TEST_CHECK_(sign*(c - a) > 0, "lambda(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                i,           t,                    a,      c,      cL,           b);
+            TEST_CHECK_(sign*(c - b) < 0, "lambda(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                i,           t,                    a,      c,      cL,           b);
+            a  = s1.lambda(2*i+1);
+            c  = sI.lambda(2*i+1);
+            cL = sL.lambda(2*i+1);
+            b  = s2.lambda(2*i+1);
+            sign = (b > a) ? 1 : -1;
+
+            if (abs(a) < eps && abs(b) < eps)
+                continue;
+
+            TEST_CHECK_(sign*(c - a) > 0, "lambda(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                i,           t,                    a,      c,      cL,           b);
+            TEST_CHECK_(sign*(c - b) < 0, "lambda(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
+                                                i,           t,                    a,      c,      cL,           b);
+        }
+    }
+}
+
+
 TEST_LIST = {
    { "phi", test_Phi },
    { "jacobian", test_Fq },
@@ -277,5 +388,7 @@ TEST_LIST = {
    { "_input_.setPJointAndSigma", test_SetPJoint },
    { "setAssembly", test_SetAssembly },
    { "solveHDCA", test_solveHDCA},
+   { "atTime", test_atTime},
+   { "interpolation", test_interpolate},
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

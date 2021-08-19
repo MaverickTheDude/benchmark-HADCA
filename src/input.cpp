@@ -8,7 +8,7 @@ using namespace Eigen;
 
 #define SIMULATION_TIME 1.0
 #define TIME_STEP 0.01
-#define LOG_ENERGY true
+#define LOG_ENERGY false
 
 _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
                                   dalpha0(Nbodies),   pjoint0(Nbodies),

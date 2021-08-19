@@ -19,14 +19,12 @@ int main(int argc, char* argv[]) {
 
 	sol.print();
 
-
-	MatrixXd x = jointToAbsoluteCoords(sol.alpha.col(1), sol.dalpha.col(1), sol.d2alpha.col(1), input);
+	// MatrixXd x = jointToAbsoluteCoords(sol.alpha.col(1), sol.dalpha.col(1), sol.d2alpha.col(1), input);
 	VectorXd q = jointToAbsolutePosition(sol.alpha.col(1), input);
 	VectorXd v = jointToAbsoluteVelocity(sol.alpha.col(1), sol.dalpha.col(1), input);
-	cout << x << endl;
 
-	cout << q << endl;
-	cout << v << endl;
+	// cout << q << endl;
+	// cout << v << endl;
 
     cout << "done" << endl;
     return 0;

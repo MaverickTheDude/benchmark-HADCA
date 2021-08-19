@@ -1,44 +1,42 @@
 #include "../include/solution.h"
+#include "../include/constants.h"
 #include <fstream>
 
-int _solution_::atTime(const double& t) {
+std::pair<int, const bool> _solution_::atTime(const double& t, const _input_& input) const {
 	/* 
 	* Znajduje indeks wartosci t w wektorze T metoda bisekcji. 
 	* Ostatnie kilka krokow odbywa sie liniowo, zeby nie bawic sie corner case'y
-    * to do: automatyczny test
+	* Zwraca pare <indeks, NodeValue>
 	*/
+	const double& dt = input.dt;
     int begin = 0;
     int end = T.size()-1;
 
 	const int linearSearchRegion = 5;
 	while (end - begin > linearSearchRegion) {
 		const int mid = (begin + end) / 2;
-		if ( abs(t - T(mid)) < 1e-10 ) return mid;
+		if ( abs(t - T(mid)) < 1e-10 ) return std::make_pair(mid, NODE_VALUE);
 		if (t > T(mid))		begin = mid;
 		else				end   = mid;
 	}
 
-	for (int i = begin; i <= end; i++)
-		if ( abs(t - T(i)) < 1e-10 ) return i;
+	for (int i = begin; i <= end; i++) {
+		if ( abs(T(i) 	   - t) < 1e-10 ) return std::make_pair(i, NODE_VALUE);
+		if ( abs(T(i)+dt/2 - t) < 1e-10 ) return std::make_pair(i, INTERMEDIATE_VALUE);
+	}
 
-	throw std::runtime_error("inex not found");
+	throw std::runtime_error("atTime: index not found");
 }
 
-int _solution_::atTimeRev(const double& tau) {
-	const double Tk = T(T.size()-1);
-	const double t = Tk - tau;
-	return atTime(t);
-}
-
-dataJoint _solution_::getDynamicValuesRev(const double& tau) {
+dataJoint _solution_::getDynamicValues(const int index, const _input_& input) const {
 	const int Nvars = alpha.rows();
 	dataJoint data = dataJoint(Nvars);
-	const int t_ind = atTimeRev(tau);
-	data.alpha   = alpha.col(t_ind);
-	data.dalpha  = dalpha.col(t_ind);
-	data.d2alpha = d2alpha.col(t_ind);
-	data.lambda  = lambda.col(t_ind);
-	data.pjoint  = pjoint.col(t_ind);
+	data.t       = T(index);
+	data.alpha   = alpha.col(index);
+	data.dalpha  = dalpha.col(index);
+	data.d2alpha = d2alpha.col(index);
+	data.lambda  = lambda.col(index);
+	data.pjoint  = pjoint.col(index);
 
 	return data;
 }

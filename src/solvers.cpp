@@ -4,15 +4,36 @@
 
 using namespace Eigen;
 
-VectorXd RK_AdjointSolver(const _input_& input, _solution_& solution) {
-    // to do
+VectorXd RK_AdjointSolver(const _input_& input, const _solution_& solutionFwd) {
+	const double dt = input.dt;
+	const double Tk = input.Tk;
+	const int Nbodies = input.Nbodies;
+	VectorXd solution(2*Nbodies);
+
+	const VectorXd& T = solutionFwd.T;
+	VectorXd y_m1(2*Nbodies);
+	y_m1.setZero(); // to do: boundary conditions
+
+	const int preLastNode = input.Nsamples - 2; // backwards integration
+	for (int i = preLastNode; i >= 0; i--) {
+        const double t = T(i-1);
+		VectorXd k1 = RHS_ADJOINT(t			, y_m1, 			  solutionFwd, input);
+		VectorXd k2 = RHS_ADJOINT(t + dt/2.0, y_m1 + dt/2.0 * k1, solutionFwd, input);
+		VectorXd k3 = RHS_ADJOINT(t + dt/2.0, y_m1 + dt/2.0 * k2, solutionFwd, input);
+		VectorXd k4 = RHS_ADJOINT(t + dt,     y_m1 + dt     * k3, solutionFwd, input);
+
+		VectorXd y = y_m1 +  dt/6 * (k1 + 2*k2 + 2*k3 + k4);
+		y_m1 = y;
+	}
+
+	return solution;
 }
 
 _solution_ RK_solver(const _input_& input) {
 	const double dt = input.dt;
 	const double Tk = input.Tk;
 	const int Nbodies = input.Nbodies;
-    _solution_ solution(input); // TODO: przy wyjsciu z funkcji solution zostanie przekopiowane. Zrobic lepszy menege pamieci
+    _solution_ solution(input); // note: Return Value Optimization (RVO) guarantees copy elison (details in solution.h)
 
 	VectorXd T = VectorXd::LinSpaced(input.Nsamples, 0, Tk);
     solution.setT(T);

@@ -13,3 +13,6 @@ const double _J_link_ = 0.0333;
 const Matrix2d I = Matrix2d::Identity();
 const Matrix2d Om = Rot(M_PI_2);
 const double M_GRAV = 9.80665;
+
+const bool NODE_VALUE = true;
+const bool INTERMEDIATE_VALUE = false;
