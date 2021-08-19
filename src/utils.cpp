@@ -2,8 +2,9 @@
 #include "../include/input.h"
 #include "../Eigen/Dense"
 #include "../include/constants.h"
+#include "../include/task/M.h"
 
-    #include <iostream>
+#include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <math.h>
@@ -21,7 +22,7 @@ MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd &, const _input_ &), Vector
 {
     const double h = 1e-8;
     const int n = q0.size();
-    const int Nf = input.Nconstr;
+    const int Nf = fun(q0, input).size();
 
     MatrixXd Fun_q(Nf, n);
     for (int i = 0; i < n; i++)
@@ -85,9 +86,15 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
     return dq;
 }
 
-// struct coordinates {
-
-// }
+VectorXd absolutePositionToAbsoluteAlpha(const VectorXd& q)
+{
+    const int qSize = q.size();
+    VectorXd absoluteAlpha = VectorXd::Zero(qSize / 3);
+    for(int i = 2; i < qSize; i += 3)
+        absoluteAlpha((i - 2) / 3) = q(i);
+    
+    return absoluteAlpha;
+}
 
 MatrixXd jointToAbsoluteCoords(const VectorXd &alpha, const VectorXd &dalpha, 
                                const VectorXd &d2alpha, const _input_ &input)
@@ -133,12 +140,17 @@ MatrixXd jointToAbsoluteCoords(const VectorXd &alpha, const VectorXd &dalpha,
 }
 
 /* opcje dla vec : {s12, s21, s1C, s2C} */
-Matrix3d SAB(const std::string &_sAB_, const int id, const VectorXd &alphaAbs, const _input_ &input)
+Matrix3d SAB(const std::string &_sAB_, const int id, const double alphaAbs, const _input_ &input)
 {
     Vector2d sAB = input.pickBodyType(id).dimensions.at(_sAB_);
     Matrix3d out = Matrix3d::Identity();
-    out.block(2, 0, 1, 2) = (Om * Rot(alphaAbs(id)) * sAB).transpose();
+    out.block(2, 0, 1, 2) = (Om * Rot(alphaAbs) * sAB).transpose();
     return out;
+}
+
+Matrix3d SAB(const std::string &_sAB_, const int id, const VectorXd &alphaAbs, const _input_ &input)
+{
+    return SAB(_sAB_, id, alphaAbs(id), input);
 }
 
 Matrix3d dSAB(const std::string& _sAB_, const int id, const VectorXd& alphaAbs, 
@@ -147,6 +159,18 @@ Matrix3d dSAB(const std::string& _sAB_, const int id, const VectorXd& alphaAbs,
     Matrix3d out = Matrix3d::Zero();
     out.block(2, 0, 1, 2) = (-1.0) * (Rot(alphaAbs(id)) * sAB).transpose() * dAlphaAbs(id);
     return out;
+}
+
+Matrix3d dSABdAlpha(const Vector2d& translation, const double absoluteAlpha)
+{
+    /** 
+     * Returns derivative dSAB / dAbsoluteAlpha (3 x 3).
+     */
+
+    Matrix3d S = Matrix3d::Zero();
+    S.block(2, 0, 1, 2) = (- Rot(absoluteAlpha) * translation).transpose();
+
+    return S;
 }
 
 VectorXd joint2AbsAngles(const VectorXd &alpha)
@@ -165,11 +189,7 @@ VectorXd joint2AbsAngles(const VectorXd &alpha)
 
 Matrix3d massMatrix(const int id, const _input_& input)
 {
-    Matrix3d out = Matrix3d::Zero();
-    out(0, 0) = input.pickBodyType(id).m;
-    out(1, 1) = input.pickBodyType(id).m;
-    out(2, 2) = input.pickBodyType(id).J;
-    return out;
+    return task::M::local(id, input);
 }
 
 Vector3d Q1_init(int id, const VectorXd &alphaAbs, const _input_ &input)

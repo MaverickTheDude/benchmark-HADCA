@@ -18,6 +18,9 @@ namespace task
 
         VectorXd operator()(const VectorXd& q) const;
         MatrixXd q(const VectorXd& q) const;
+        MatrixXd ddqddqlambda(const VectorXd& q, const VectorXd& lambda) const;
+        VectorXd ddqddqlambda(const VectorXd& q, const VectorXd& lambda,
+            const VectorXd& ksi) const;
 
         MatrixXd qDenseMatrix(const VectorXd& q) const;;
         MatrixXd qDenseChunked(const VectorXd& q, const int jointNumber) const;

@@ -197,6 +197,7 @@ void test_SetPJoint(void) {
     }
 }
 
+
 #include "include/input.h"
 #include "Eigen/Dense"
 #include "include/utils.h"
@@ -238,7 +239,6 @@ void test_SetAssembly(void) {
 }
 
 
-
 void test_solveHDCA(void) {
 /*
  * Test na podstawie zachowania energii w ukladzie. Dla dluzszych czasow symulacji konieczne jest obnizenie tolerancji.
@@ -267,6 +267,149 @@ void test_solveHDCA(void) {
                 diff, diff/e1*100, e1*Rtol, Rtol*100, e1, e2, Nbodies);
 }
 
+
+#include "include/task/F.h"
+
+namespace F_1_q
+{
+    struct data_struct
+    {
+        task::F* F;
+        VectorXd* dq;
+        VectorXd* u;
+    } data;
+
+    VectorXd wrapper(const VectorXd& q, const _input_& input)
+    {
+        return data.F->operator()(q, *data.dq, *data.u);
+    }
+
+    void test(void)
+    {
+        int NBodies = 10;
+        _input_ input = _input_(NBodies);
+        task::F_1 F(input);
+
+        VectorXd q = jointToAbsolutePosition(input.alpha0, input);
+        VectorXd dq = jointToAbsolutePosition(input.dalpha0, input);
+        VectorXd u = (VectorXd(1) << 0).finished();
+
+        data = (data_struct) {.F = &F, .dq = &dq, .u = &u};
+
+        MatrixXd F_q_FDM = jacobianReal(wrapper, q, input).transpose();
+        MatrixXd F_q_explicit = F.q(q, dq, u);
+        MatrixXd diff = F_q_FDM - F_q_explicit;
+        
+        TEST_CHECK_(diff.norm() <= eps, "Error: %f (threshold: %f)\n", diff.norm(), eps);
+    }
+}
+
+
+#include "include/task/F.h"
+
+using namespace Eigen;
+
+namespace F_1_dq
+{
+    struct data_struct
+    {
+        task::F* F;
+        VectorXd* q;
+        VectorXd* u;
+    } data;
+
+    VectorXd wrapper(const VectorXd& dq, const _input_& input)
+    {
+        return data.F->operator()(*data.q, dq, *data.u);
+    }
+
+    void test(void)
+    {
+        int NBodies = 10;
+        _input_ input = _input_(NBodies);
+        task::F_1 F(input);
+
+        VectorXd q = jointToAbsolutePosition(input.alpha0, input);
+        VectorXd dq = jointToAbsolutePosition(input.dalpha0, input);
+        VectorXd u = (VectorXd(1) << 0).finished();
+
+        data = (data_struct) {.F = &F, .q = &q, .u = &u};
+
+        MatrixXd F_dq_FDM = jacobianReal(wrapper, dq, input).transpose();
+        MatrixXd F_dq_explicit = F.dq(q, dq, u);
+        MatrixXd diff = F_dq_FDM - F_dq_explicit;
+        
+        TEST_CHECK_(diff.norm() <= eps, "Error: %f (threshold: %f)\n", diff.norm(), eps);
+    }
+}
+
+#include "include/task/M.h"
+
+using namespace Eigen;
+
+namespace M_ddqdq
+{
+    struct data_struct
+    {
+        task::M* M;
+        VectorXd* dq;
+    } data;
+
+    VectorXd wrapper(const VectorXd& q, const _input_& input)
+    {
+        return data.M->operator()(q) * (*data.dq);
+    }
+
+    void test(void)
+    {
+        int NBodies = 10;
+        _input_ input = _input_(NBodies);
+        task::M M(input);
+        VectorXd q = jointToAbsolutePosition(input.alpha0, input);
+        VectorXd dq = VectorXd::Ones(3 * NBodies);
+
+        data = (data_struct) {.M = &M, .dq = &dq};
+
+        MatrixXd Mdq_q_FDM = jacobianReal(wrapper, q, input).transpose();
+        MatrixXd Mdq_q_explicit = M.ddqdq(q, dq);
+        MatrixXd diff = Mdq_q_FDM - Mdq_q_explicit;
+
+        TEST_CHECK_(diff.norm() <= eps, "Error: %f (threshold: %f)\n", diff.norm(), eps);
+    }
+}
+
+#include "include/task/Phi.h"
+
+namespace Phi_ddqddqlambda
+{
+    struct data_struct
+    {
+        task::Phi* Phi;
+        VectorXd* lambda;
+    } data;
+
+    VectorXd wrapper(const VectorXd& q, const _input_& input)
+    {
+        return data.Phi->q(q).transpose() * (*data.lambda);
+    }
+
+    void test(void)
+    {
+        int NBodies = 10;
+        _input_ input = _input_(NBodies);
+        task::Phi Phi(input);
+        VectorXd q = jointToAbsolutePosition(input.alpha0, input);
+        VectorXd lambda = VectorXd::Ones(input.Nconstr);
+
+        data = (data_struct) {.Phi = &Phi, .lambda = &lambda};
+
+        MatrixXd Phi_FDM = jacobianReal(wrapper, q, input).transpose();
+        MatrixXd Phi_explicit = Phi.ddqddqlambda(q, lambda);
+        MatrixXd diff = Phi_FDM - Phi_explicit;
+
+        TEST_CHECK_(diff.norm() <= eps, "Error: %f (threshold: %f)\n", diff.norm(), eps);
+    }
+}
 
 void test_atTime(void) {
     const int eps = 1e-10;
@@ -378,7 +521,6 @@ void test_interpolate(void) {
     }
 }
 
-
 TEST_LIST = {
    { "phi", test_Phi },
    { "jacobian", test_Fq },
@@ -388,6 +530,10 @@ TEST_LIST = {
    { "_input_.setPJointAndSigma", test_SetPJoint },
    { "setAssembly", test_SetAssembly },
    { "solveHDCA", test_solveHDCA},
+   { "F_1_q", F_1_q::test},
+   { "F_1_dq", F_1_dq::test},
+   { "M_ddqdq", M_ddqdq::test},
+   { "Phi_ddqddqlambda", Phi_ddqddqlambda::test},
    { "atTime", test_atTime},
    { "interpolation", test_interpolate},
    { NULL, NULL }     /* zeroed record marking the end of the list */
