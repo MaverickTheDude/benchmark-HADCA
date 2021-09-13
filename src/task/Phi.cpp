@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <vector>
+#include <utility>
 
 using namespace Eigen;
 using namespace task;
@@ -134,6 +135,183 @@ MatrixXd Phi::q(const VectorXd& q) const
                 {
                     phiQ.block(phiPile + 0, 3 * bodyB + 0, 2, 2) = -Matrix2d::Identity();
                     phiQ.block(phiPile + 0, 3 * bodyB + 2, 2, 1) = - Om * Rot(phiB) * sB;
+                }
+
+                break;
+            }
+            default:
+            {
+                std::runtime_error("Unknown joint type.");
+                break;
+            }
+        }
+
+        phiPile += jointClass;
+    }
+
+    return phiQ;
+}
+
+MatrixXd Phi::ddtq(const VectorXd& q, const VectorXd& dq) const
+{
+    MatrixXd phiQ = MatrixXd::Zero(constrDim, 3 * bodiesNumber);
+    int phiPile = 0; // analogously as in ()
+    
+    for(int jN = 0; jN < jointsNumber; jN++)
+    {
+        // Prepare joint-specific data.
+        const body::JOINT_TYPE jointType = input.pickBodyType(jN).jointType;
+        const int jointClass = 2;
+        const int bodyA = jN - 1;
+        const int bodyB = jN;
+
+        const Vector2d rA = bodyA < 0 ? Vector2d(0.0, 0.0) : q.segment(3 * bodyA + 0, 2);
+        const double phiA = bodyA < 0 ? 0 : q.segment(3 * bodyA + 2, 1).value();
+        const Vector2d rB = q.segment(3 * bodyB + 0, 2);
+        const double phiB = q.segment(3 * bodyB + 2, 1).value();
+
+        const Vector2d ddt_rA = bodyA < 0 ? Vector2d(0.0, 0.0) : dq.segment(3 * bodyA + 0, 2);
+        const double ddt_phiA = bodyA < 0 ? 0 : dq.segment(3 * bodyA + 2, 1).value();
+        const Vector2d ddt_rB = dq.segment(3 * bodyB + 0, 2);
+        const double ddt_phiB = dq.segment(3 * bodyB + 2, 1).value();
+
+        switch (jointType)
+        {
+            case body::JOINT_TYPE::PRISMATIC:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s1C;
+
+                if(bodyA >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyA + 0, 1, 2) = -(Om * Rot(phiB) * ddt_phiB * v).transpose();
+                    phiQ(phiPile + 0, 3 * bodyA + 2) = (-(Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * Rot(phiA) * sA +
+                        (Rot(phiB) * v).transpose() * Rot(phiA) * ddt_phiA * sA).value();
+                }
+
+                if(bodyB >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyB + 0, 1, 2) = (Om * Rot(phiB) * ddt_phiB * v).transpose();
+                    phiQ(phiPile + 0, 3 * bodyB + 2) = (-(Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * (rB - rA - Rot(phiA) * sA) - 
+                        (Rot(phiB) * v).transpose() * Om * ddt_rB +
+                        (Rot(phiB) * v).transpose() * Om * ddt_rA -
+                        (Rot(phiB) * v).transpose() * Rot(phiA) * ddt_phiA * sA).value();
+                }
+
+                break;
+            }
+            case body::JOINT_TYPE::REVOLUTE:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s12;
+                const Vector2d sB = Vector2d::Zero();
+
+                if(bodyA >= 0)
+                {
+
+                    phiQ.block(phiPile + 0, 3 * bodyA + 2, 2, 1) = - Rot(phiA) * ddt_phiA * sA;
+                }
+
+                if(bodyB >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyB + 2, 2, 1) = Rot(phiB) * ddt_phiB * sB;
+                }
+
+                break;
+            }
+            default:
+            {
+                std::runtime_error("Unknown joint type.");
+                break;
+            }
+        }
+
+        phiPile += jointClass;
+    }
+
+    return phiQ;
+}
+
+MatrixXd Phi::d2dt2q(const VectorXd& q, const VectorXd& dq, const VectorXd& ddq) const
+{
+    MatrixXd phiQ = MatrixXd::Zero(constrDim, 3 * bodiesNumber);
+    int phiPile = 0; // analogously as in ()
+    
+    for(int jN = 0; jN < jointsNumber; jN++)
+    {
+        // Prepare joint-specific data.
+        const body::JOINT_TYPE jointType = input.pickBodyType(jN).jointType;
+        const int jointClass = 2;
+        const int bodyA = jN - 1;
+        const int bodyB = jN;
+
+        const Vector2d rA = bodyA < 0 ? Vector2d(0.0, 0.0) : q.segment(3 * bodyA + 0, 2);
+        const double phiA = bodyA < 0 ? 0 : q.segment(3 * bodyA + 2, 1).value();
+        const Vector2d rB = q.segment(3 * bodyB + 0, 2);
+        const double phiB = q.segment(3 * bodyB + 2, 1).value();
+
+        const Vector2d ddt_rA = bodyA < 0 ? Vector2d(0.0, 0.0) : dq.segment(3 * bodyA + 0, 2);
+        const double ddt_phiA = bodyA < 0 ? 0 : dq.segment(3 * bodyA + 2, 1).value();
+        const Vector2d ddt_rB = dq.segment(3 * bodyB + 0, 2);
+        const double ddt_phiB = dq.segment(3 * bodyB + 2, 1).value();
+
+        const Vector2d d2dt2_rA = bodyA < 0 ? Vector2d(0.0, 0.0) : ddq.segment(3 * bodyA + 0, 2);
+        const double d2dt2_phiA = bodyA < 0 ? 0 : ddq.segment(3 * bodyA + 2, 1).value();
+        const Vector2d d2dt2_rB = ddq.segment(3 * bodyB + 0, 2);
+        const double d2dt2_phiB = ddq.segment(3 * bodyB + 2, 1).value();
+
+        switch (jointType)
+        {
+            case body::JOINT_TYPE::PRISMATIC:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s1C;
+
+                if(bodyA >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyA + 0, 1, 2) = (Rot(phiB) * ddt_phiB * ddt_phiB * v).transpose() -
+                        (Om * Rot(phiB) * d2dt2_phiB * v).transpose();
+                    phiQ(phiPile + 0, 3 * bodyA + 2) = ((Rot(phiB) * ddt_phiB * ddt_phiB * v).transpose() * Om * Rot(phiA) * sA +
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Rot(phiA) * ddt_phiA * sA +
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Rot(phiA) * ddt_phiA * sA +
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * Rot(phiA) * ddt_phiA * ddt_phiA * sA -
+                        (Om * Rot(phiB) * d2dt2_phiB * v).transpose() * Om * Rot(phiA) * sA +
+                        (Rot(phiB) * v).transpose() * Rot(phiA) * d2dt2_phiA * sA).value();
+                }
+
+                if(bodyB >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyB + 0, 1, 2) = - (Rot(phiB) * ddt_phiB * ddt_phiB * v).transpose() +
+                        (Om * Rot(phiB) * d2dt2_phiB * v).transpose();
+                    phiQ(phiPile + 0, 3 * bodyB + 2) = ((Rot(phiB) * ddt_phiB * ddt_phiB * v).transpose() * Om * (rB - rA - Rot(phiA) * sA) -
+                        (Om * Rot(phiB) * d2dt2_phiB * v).transpose() * Om * (rB - rA - Rot(phiA) * sA) -
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * ddt_rB +
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * ddt_rA -
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Rot(phiA) * ddt_phiA * sA -
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * ddt_rB -
+                        (Rot(phiB) * v).transpose() * Om * d2dt2_rB +
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Om * ddt_rA +
+                        (Rot(phiB) * v).transpose() * Om * d2dt2_rA -
+                        (Om * Rot(phiB) * ddt_phiB * v).transpose() * Rot(phiA) * ddt_phiA * sA -
+                        (Rot(phiB) * v).transpose() * Om * Rot(phiA) * ddt_phiA * ddt_phiA * sA -
+                        (Rot(phiB) * v).transpose() * Rot(phiA) * d2dt2_phiA * sA).value();
+                }
+
+                break;
+            }
+            case body::JOINT_TYPE::REVOLUTE:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s12;
+                const Vector2d sB = Vector2d::Zero();
+
+                if(bodyA >= 0)
+                {
+
+                    phiQ.block(phiPile + 0, 3 * bodyA + 2, 2, 1) = - Om * Rot(phiA) * ddt_phiA * ddt_phiA  * sA -
+                        Rot(phiA) * d2dt2_phiA * sA;
+                }
+
+                if(bodyB >= 0)
+                {
+                    phiQ.block(phiPile + 0, 3 * bodyB + 2, 2, 1) = Om * Rot(phiB) * ddt_phiB * ddt_phiB * sB + 
+                        Rot(phiB) * d2dt2_phiB * sB;
                 }
 
                 break;
@@ -321,6 +499,214 @@ VectorXd Phi::ddqddqlambda(const VectorXd& q, const VectorXd& lambda, const Vect
     return rhs;
 }
 
+VectorXd Phi::ddqddqlambda(const int bodyNumber, const VectorXd& q, const VectorXd& lambda,
+    const VectorXd& ksi) const
+{
+    VectorXd rhs = VectorXd::Zero(3);
+
+    /**
+     * For joints involving bodyNumber
+     * 
+     * In this simplyfied implementation, a dummy bodyAjacents vector is
+     * prepared on the fly. In the generalised approach such a vector is
+     * prepared once at the structure initialization stage.
+     */
+    struct jointData {
+        int bodyA;
+        int bodyB;
+        int jN;
+        int phiPile;
+
+        jointData(int _bodyA, int _bodyB, int _jN, int _phiPile) :
+            bodyA(_bodyA), bodyB(_bodyB), jN(_jN), phiPile(_phiPile) {} 
+    };
+
+    std::vector<struct jointData> bodyAdjacents;
+    bodyAdjacents.emplace_back(bodyNumber - 1, bodyNumber, bodyNumber, 2 * bodyNumber);
+    if(bodyNumber< input.Nbodies - 1)
+        bodyAdjacents.emplace_back(bodyNumber, bodyNumber + 1, bodyNumber + 1, 2 * (bodyNumber + 1));
+
+    for(std::vector<struct jointData>::iterator joint = bodyAdjacents.begin(); 
+        joint < bodyAdjacents.end(); joint++)
+    {
+        /**
+         * Prepare joint-specific data. In generalised version jN should suffice
+         * to acquire all other joint's variables (jointType, jointClass, bodyA, bodyB, phiPile)
+         */
+        const int jN = joint->jN;
+
+        const body::JOINT_TYPE jointType = input.pickBodyType(jN).jointType;
+        const int jointClass = 2;
+
+        const int bodyA = joint->bodyA;
+        const int bodyB = joint->bodyB;
+
+        const int phiPile = joint->phiPile;
+
+        // Comment out rA and rB as they are not used in the current implementation
+        // const Vector2d rA = bodyA < 0 ? Vector2d(0.0, 0.0) : q.segment(3 * bodyA + 0, 2);
+        const double phiA = bodyA < 0 ? 0 : q.segment(3 * bodyA + 2, 1).value();
+        // const Vector2d rB = q.segment(3 * bodyB + 0, 2);
+        const double phiB = q.segment(3 * bodyB + 2, 1).value();
+
+        switch (jointType)
+        {
+            case body::JOINT_TYPE::PRISMATIC:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s1C;
+
+                if(bodyA >= 0 && bodyNumber == bodyA)
+                {
+                    rhs(2) += ((Rot(phiA) * sA).transpose() * Rot(phiB) *
+                        v * lambda(phiPile) * ksi(3 * bodyA + 2)).value();
+                }
+
+                if(bodyB >= 0 && bodyNumber == bodyB)
+                {
+                    rhs.segment(0, 2) += Om * Rot(phiB) * v * lambda(phiPile) * ksi(3 * bodyB + 2);
+                    rhs(2) += ((Om * Rot(phiB) * v *
+                        lambda(phiPile)).transpose() * ksi.segment(3 * bodyB + 0, 2)).value();
+                }
+
+                if(bodyA >= 0 && bodyB >= 0)
+                {
+                    if(bodyA == bodyNumber)
+                    {
+                        rhs.segment(0, 2) += Om * Rot(phiB) * v *
+                            lambda(phiPile) * ksi(3 * bodyB + 2);
+                        rhs(2) += ((Rot(phiA) * sA).transpose() *
+                            Rot(phiB) * v * lambda(phiPile) * ksi(3 * bodyB + 2)).value();
+                    }
+                    else
+                    {
+                        rhs(2) += ((Om * Rot(phiB) * v *
+                            lambda(phiPile)).transpose() * ksi.segment(3 * bodyA + 0, 2)).value();
+                        rhs(2) += ((Rot(phiA) * sA).transpose() *
+                            Rot(phiB) * v * lambda(phiPile) * ksi(3 * bodyA + 2)).value();
+                    }
+                }
+
+                break;
+            }
+            case body::JOINT_TYPE::REVOLUTE:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s12;
+                const Vector2d sB = Vector2d::Zero();
+
+                if(bodyA >= 0 && bodyNumber == bodyA)
+                {
+                    rhs(2) += (- (Rot(phiA) * sA).transpose() *
+                        lambda.segment(phiPile, jointClass) * ksi(3 * bodyA + 2)).value();
+                }
+
+                if(bodyB >= 0 && bodyNumber == bodyB)
+                {
+                    rhs(2) += ((Rot(phiB) * sB).transpose() *
+                        lambda.segment(phiPile, jointClass) * ksi(3 * bodyB + 2)).value();
+                }
+
+                break;
+            }
+        }
+    }
+
+    return rhs;
+}
+
+Vector3d Phi::ddqddqlambda3d(const int bodyNumber, const VectorXd& q,
+    const VectorXd& lambda, const Vector3d& ksi) const
+{
+    /**
+     * WARNING! This version works only for a model: Pendulum on a cart.
+     * It exploits its specific matrix structure.
+     */
+    Vector3d rhs = Vector3d::Zero(3);
+
+    struct jointData {
+        int bodyA;
+        int bodyB;
+        int jN;
+        int phiPile;
+
+        jointData(int _bodyA, int _bodyB, int _jN, int _phiPile) :
+            bodyA(_bodyA), bodyB(_bodyB), jN(_jN), phiPile(_phiPile) {} 
+    };
+
+    std::vector<struct jointData> bodyAdjacents;
+    bodyAdjacents.emplace_back(bodyNumber - 1, bodyNumber, bodyNumber, 2 * bodyNumber);
+    if(bodyNumber< input.Nbodies - 1)
+        bodyAdjacents.emplace_back(bodyNumber, bodyNumber + 1, bodyNumber + 1, 2 * (bodyNumber + 1));
+
+    for(std::vector<struct jointData>::iterator joint = bodyAdjacents.begin(); 
+        joint < bodyAdjacents.end(); joint++)
+    {
+        const int jN = joint->jN;
+
+        const body::JOINT_TYPE jointType = input.pickBodyType(jN).jointType;
+        const int jointClass = 2;
+
+        const int bodyA = joint->bodyA;
+        const int bodyB = joint->bodyB;
+
+        const int phiPile = joint->phiPile;
+
+        const double phiA = bodyA < 0 ? 0 : q.segment(3 * bodyA + 2, 1).value();
+        const double phiB = q.segment(3 * bodyB + 2, 1).value();
+
+        switch (jointType)
+        {
+            case body::JOINT_TYPE::PRISMATIC:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s1C;
+
+                if(bodyA >= 0 && bodyNumber == bodyA)
+                {
+                    rhs(2) += ((Rot(phiA) * sA).transpose() * Rot(phiB) *
+                        v * lambda(phiPile) * ksi(2)).value();
+                }
+
+                if(bodyB >= 0 && bodyNumber == bodyB)
+                {
+                    rhs.segment(0, 2) += Om * Rot(phiB) * v * lambda(phiPile) * ksi(2);
+                    rhs(2) += ((Om * Rot(phiB) * v *
+                        lambda(phiPile)).transpose() * ksi.segment(0, 2)).value();
+                }
+
+                if(bodyA >= 0 && bodyB >= 0)
+                {
+                    /**
+                     * This condition is never true in this model-specific version.
+                     * If program entered this block of code, it would be impossible
+                     * to find proper values of ksi to multiply by.
+                     */
+                }
+
+                break;
+            }
+            case body::JOINT_TYPE::REVOLUTE:
+            {
+                const Vector2d sA = bodyA < 0 ? Vector2d(0.0, 0.0) : input.pickBodyType(bodyA).s12;
+                const Vector2d sB = Vector2d::Zero();
+
+                if(bodyA >= 0 && bodyNumber == bodyA)
+                {
+                    rhs(2) += (- (Rot(phiA) * sA).transpose() *
+                        lambda.segment(phiPile, jointClass) * ksi(2)).value();
+                }
+
+                if(bodyB >= 0 && bodyNumber == bodyB)
+                {
+                    rhs(2) += ((Rot(phiB) * sB).transpose() *
+                        lambda.segment(phiPile, jointClass) * ksi(2)).value();
+                }
+
+                break;
+            }
+        }
+    }
+
+    return rhs;
+}
 
 MatrixXd Phi::qDenseMatrix(const VectorXd& q) const
 {

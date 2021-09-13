@@ -5,6 +5,7 @@
 #include "../../include/utils.h"
 #include "../../include/constants.h"
 #include "../../include/body.h"
+#include "../../include/task/M.h"
 
 using namespace task;
 using namespace Eigen;
@@ -74,8 +75,8 @@ VectorXd F_1::operator()(const int bodyNumber, const VectorXd &q, const VectorXd
 MatrixXd F_1::q(const int bodyNumber, const VectorXd &q, const VectorXd &dq, const VectorXd &u) const
 {
     Matrix3d F_1_q = Matrix3d::Zero();
-    F_1_q.block(2, 0, 1, 3) = (dSABdAlpha(input.pickBodyType(bodyNumber).s1C,
-        q(3 * bodyNumber + 2)) * g).transpose();
+    Matrix3d dS_dAlpha = dSABdAlpha(input.pickBodyType(bodyNumber).s1C, q(3 * bodyNumber + 2));
+    F_1_q.block(2, 0, 1, 3) = ( dS_dAlpha * M::local(bodyNumber, input) * g ).transpose();
 
     return F_1_q;
 }

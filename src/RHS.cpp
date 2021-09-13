@@ -6,33 +6,18 @@
     #include <iostream>
 using std::vector;
 
-VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input) {
+VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& u, const _input_& input) {
     _solution_ solution;
-    return RHS_HDCA(t, y, input, solution);
+    return RHS_HDCA(t, y, u, input, solution);
 }
 
-VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _solution_& solutionFwd, const _input_& input) {
-    const unsigned int n = y.size()/2;
-    VectorXd e = y.head(n);
-    VectorXd c = y.tail(n);
-    dataJoint state = interpolate(t, solutionFwd, input);
-    VectorXd de(n);
-
-// e,c to eta,xi
-// ??? q, dq, d2q, lambda, ! u
-
-    VectorXd dy(2*n);
-    dy.head(n) = de;
-    dy.tail(n) = -e; // == dc
-    return dy;
-}
-
-VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _solution_& solution) {
+VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_& input, _solution_& solution) {
 	const unsigned int n = y.size()/2;
     VectorXd pjoint = y.head(n);
     VectorXd alpha  = y.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
     VectorXd dalpha(n), dpjoint(n);
+    const double u = interpolateControl(t, uVec, input);
 
     // vector<vector<Assembly>> tree;
     vector<vector<Assembly, aligned_allocator<Assembly> >, aligned_allocator<Assembly> > tree;
@@ -44,7 +29,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input, _sol
     /* Initialize leaf bodies (baza indukcyjna) */
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
     for (int i = 0; i < input.Nbodies; i++)
-        leafBodies.emplace_back(i, alphaAbs, pjoint, input);
+        leafBodies.emplace_back(i, alphaAbs, pjoint, u, input);
 
     for (int i = 1; i < input.Ntiers; i++) {
         vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];

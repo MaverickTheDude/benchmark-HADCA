@@ -38,9 +38,9 @@ MatrixXd M::operator()(const VectorXd& q) const
     return m;
 }
 
-MatrixXd M::ddt(const VectorXd& q) const
+MatrixXd M::ddt(const VectorXd& q, const VectorXd& dq) const
 {
-    MatrixXd m = MatrixXd(3 * input.Nbodies, 3 * input.Nbodies);
+    MatrixXd m = MatrixXd::Zero(3 * input.Nbodies, 3 * input.Nbodies); // It's not zero. Please, update this function in future.
 
     return m;
 }
@@ -81,9 +81,14 @@ MatrixXd M::operator()(const int bodyNumber, const VectorXd& q) const
     return m;
 }
 
-MatrixXd M::ddt(const int bodyNumber, const VectorXd& q) const
+MatrixXd M::ddt(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const
 {
-    MatrixXd m = MatrixXd::Zero(3, 3);
+    const MatrixXd S1C = SAB("s1C", bodyNumber, q(3 * bodyNumber + 2), input);
+    const MatrixXd dS1Cdt = dSAB("s1C", bodyNumber, q(3 * bodyNumber + 2),
+        dq(3 * bodyNumber + 2), input);
+
+    MatrixXd m = dS1Cdt * local(bodyNumber) * S1C.transpose() +
+        S1C * local(bodyNumber) * dS1Cdt.transpose();
 
     return m;
 }
@@ -107,9 +112,9 @@ MatrixXd M::ddqdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq) c
     return m;
 }
 
-VectorXd M::ddt(const VectorXd& q, const VectorXd& eta) const
+VectorXd M::ddt(const VectorXd& q, const VectorXd& dq, const VectorXd& eta) const
 {
-    return VectorXd::Zero(3 * input.Nbodies);
+    return ddt(q, dq) * eta;
 }
 
 VectorXd M::ddqdq(const VectorXd& q, const VectorXd& dq, const VectorXd& eta ) const

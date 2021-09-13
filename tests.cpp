@@ -207,13 +207,14 @@ using namespace Eigen;
 
 void test_SetAssembly(void) {
     _input_ input = _input_(4);
+	const double U_ZERO = 0.0; // quick hack
 
     for( int id = 0; id <= input.Nbodies - 1; id++)
     {
         VectorXd sigmaStacked = input.sigma0;
         VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
         VectorXd alphaAbs = joint2AbsAngles(input.alpha0);
-        Assembly body(id, alphaAbs, input.pjoint0, input);
+        Assembly body(id, alphaAbs, input.pjoint0, U_ZERO, input);
         Vector3d T1A = input.pickBodyType(id).D   * sigmaStacked.segment(2*id, 2);
         Vector3d T2A;
         if (id == input.Nbodies - 1)
@@ -521,6 +522,101 @@ void test_interpolate(void) {
     }
 }
 
+namespace PhiTimeDerivatives
+{
+    double test_time = 0.9;
+    double eps = 1e-6;
+
+    struct data_struct
+    {
+        _input_* input;
+        task::Phi* Phi;
+        _solution_* solution;
+        double t = 0.0;
+
+        data_struct() : input(NULL), Phi(NULL), solution(NULL) {}
+
+        data_struct(_input_* i, task::Phi* P, _solution_* s, double test_time) :
+            input(i), Phi(P), solution(s)
+        {
+            t = floor(test_time / input->dt) * input->dt;
+        }
+
+    } data;
+
+    VectorXd q(double t)
+    {
+        dataJoint solution_t = interpolate(t, *data.solution, *data.input);
+        dataAbsolute absoluteSolution_t(VectorXd::Zero(3 * data.input->Nbodies), VectorXd::Zero(3 * data.input->Nbodies),
+            solution_t, *data.input);
+        return absoluteSolution_t.q;
+    }
+
+    VectorXd dq(double t)
+    {
+        dataJoint solution_t = interpolate(t, *data.solution, *data.input);
+        dataAbsolute absoluteSolution_t(VectorXd::Zero(3 * data.input->Nbodies), VectorXd::Zero(3 * data.input->Nbodies),
+            solution_t, *data.input);
+        return absoluteSolution_t.dq;
+    }
+
+    VectorXd ddq(double t)
+    {
+        dataJoint solution_t = interpolate(t, *data.solution, *data.input);
+        dataAbsolute absoluteSolution_t(VectorXd::Zero(3 * data.input->Nbodies), VectorXd::Zero(3 * data.input->Nbodies),
+            solution_t, *data.input);
+        return absoluteSolution_t.d2q;
+    }
+
+    namespace ddt
+    {
+        VectorXd wrapper(const VectorXd& q, const _input_& input)
+        {
+            return data.Phi->q(q) * dq(data.t);
+        }
+
+        void test(void)
+        {
+            int NBodies = 10;
+            _input_ input = _input_(NBodies);
+            task::Phi Phi(input);
+            _solution_ solution = RK_solver(input);
+
+            data = data_struct(&input, &Phi, &solution, test_time);
+
+            MatrixXd Phi_ddt_explicit = Phi.ddtq(q(data.t), dq(data.t));
+            MatrixXd Phi_ddt_FDM = jacobianReal(wrapper, q(data.t), input);
+            MatrixXd diff = Phi_ddt_FDM - Phi_ddt_explicit;
+            TEST_CHECK_(diff.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n", diff.norm(), eps);
+        }
+    }
+
+    namespace d2dt2
+    {
+        VectorXd wrapper(const VectorXd& q, const _input_& input)
+        {
+            return data.Phi->ddtq(q, dq(data.t)) * dq(data.t) + 
+                data.Phi->q(q) * ddq(data.t);
+        }
+
+        void test(void)
+        {
+            int NBodies = 10;
+            _input_ input = _input_(NBodies);
+            task::Phi Phi(input);
+            _solution_ solution = RK_solver(input);
+
+            data = data_struct(&input, &Phi, &solution, test_time);
+
+            MatrixXd Phi_d2dt2_explicit = Phi.d2dt2q(q(data.t), dq(data.t), ddq(data.t));
+            MatrixXd Phi_d2dt2_FDM = jacobianReal(wrapper, q(data.t), input);
+            MatrixXd diff = Phi_d2dt2_FDM - Phi_d2dt2_explicit;
+
+            TEST_CHECK_(diff.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n", diff.norm(), eps);
+        }
+    }
+}
+
 TEST_LIST = {
    { "phi", test_Phi },
    { "jacobian", test_Fq },
@@ -536,5 +632,7 @@ TEST_LIST = {
    { "Phi_ddqddqlambda", Phi_ddqddqlambda::test},
    { "atTime", test_atTime},
    { "interpolation", test_interpolate},
+   { "Phi_ddtq", PhiTimeDerivatives::ddt::test},
+   { "Phi_d2dt2q", PhiTimeDerivatives::d2dt2::test},
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

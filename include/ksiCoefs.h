@@ -1,6 +1,7 @@
 #pragma once
 
-#include "input.h"
+#include "../include/input.h"
+#include "../include/solution.h"
 #include "../Eigen/Dense"
 
 using namespace Eigen;
@@ -12,6 +13,7 @@ public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);
     ksi_coefs(const ksi_coefs& ksiA, const ksi_coefs& ksiB);
+	ksi_coefs(const int id, const dataAbsolute& data, const double& u, const _input_& input);
 
 	Matrix3d k11() const {return i11;}
 	Matrix3d k12() const {return i12;}

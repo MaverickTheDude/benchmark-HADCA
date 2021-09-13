@@ -1,6 +1,7 @@
 #include "include/input.h"
 #include "include/utils.h"
 #include "include/adjoint.h"
+#include "include/task/Phi.h"
 #include "Eigen/Dense"
 #include <time.h>
 
@@ -13,10 +14,16 @@ using std::endl;
 int main(int argc, char* argv[]) {
     const int Nbodies = 4;
     _input_ input = _input_(Nbodies);
+	VectorXd u0(input.Nsamples);
+	u0.setZero();
 
-	VectorXd q = jointToAbsolutePosition(input.alpha0, input);
-	VectorXd dq = jointToAbsoluteVelocity(input.alpha0, input.dalpha0, input);
+	_solution_ solutionFwd = RK_solver(u0, input);
 
-	std::cout<<Adjoint::RHS(input, q, dq, VectorXd::Ones(input.Nconstr), (VectorXd(1) << 1).finished(),
-		VectorXd::Ones(3 * input.Nbodies), VectorXd::Ones(3 * input.Nbodies))<<std::endl;
+	// solutionFwd.print();
+
+	_solutionAdj_ solution = RK_AdjointSolver(u0, solutionFwd,  input);
+	solution.print();
+
+	cout << "done\n";
+	return 0;
 }

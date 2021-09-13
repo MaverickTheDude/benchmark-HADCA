@@ -6,11 +6,29 @@
 
 using namespace Eigen;
 
+class AssemblyAdj {
+    friend VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _input_& input);
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    AssemblyAdj(const int id, const dataAbsolute& data, const double& u, const _input_& input);
+    AssemblyAdj(AssemblyAdj& AsmA, AssemblyAdj& AsmB);
+    void connect_base_body();
+    void disassemble();
+    Vector3d calculate_dETA1() const;
+    Vector3d calculate_dETA2() const;
+    void setAll(const AssemblyAdj&);
+
+public: // to do: set private
+    const ksi_coefs ksi;
+    AssemblyAdj * const ptrAsmA, * const ptrAsmB; // const jest tentatywny
+    Vector3d T1, T2;
+};
+
 class Assembly {
     friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input);
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);
+    Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const double& u, const _input_& input);
     Assembly(Assembly& AsmA, Assembly& AsmB);
     void connect_base_body();
     void disassembleAll();

@@ -88,55 +88,16 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
 
 VectorXd absolutePositionToAbsoluteAlpha(const VectorXd& q)
 {
+    // https://eigen.tuxfamily.org/dox-devel/group__TutorialSlicingIndexing.html
+    // const int qSize = q.size();
+    // VectorXd absoluteAlpha = VectorXd::Zero(q.size() / 3);
+    // absoluteAlpha = q(seqN())
     const int qSize = q.size();
     VectorXd absoluteAlpha = VectorXd::Zero(qSize / 3);
     for(int i = 2; i < qSize; i += 3)
         absoluteAlpha((i - 2) / 3) = q(i);
     
     return absoluteAlpha;
-}
-
-MatrixXd jointToAbsoluteCoords(const VectorXd &alpha, const VectorXd &dalpha, 
-                               const VectorXd &d2alpha, const _input_ &input)
-{
-    /**
-     * Converts joint alpha, dalpha, and d2alpha to their absolute counterparts [q, dq, d2q].
-     * note: 1) the caller function can use: const VectorXd& q = x.col(0);
-     *       2) alphaAbs and derivatives can be obtained from slicing
-     */
-    enum place {q, v, a};
-    MatrixXd x(3 * input.Nbodies, 3);
-    VectorXd alphaAbsolute(input.Nbodies);
-    x.block(0, 0, 6, 3) << alpha(0), dalpha(0), d2alpha(0), 
-                                0.0,       0.0,       0.0, 
-                                0.0,       0.0,       0.0,
-                            alpha(0), dalpha(0), d2alpha(0),
-                                0.0,       0.0,       0.0,
-                            alpha(1), dalpha(1), d2alpha(1);
-
-    alphaAbsolute.segment(0, 2) << alpha(0), alpha(1);
-
-// zrownoleglamy wszystkie obliczenia na raz
-    for (int i = 2; i < input.Nbodies; i++)
-    {
-        const int prev = i - 1;
-        const double phi = x(3*prev + 2, q);
-        const double om  = x(3*prev + 2, v);
-        const double eps = x(3*prev + 2, a);
-        const Vector2d& s12 = input.pickBodyType(prev).s12;
-
-        x.block(3*i, q, 2, 1) = x.block(3*prev, q, 2, 1) +  Rot(phi) * s12;
-        x(3*i + 2, q) = phi + alpha(i);
-
-
-        x.block(3*i, v, 2, 1) = x.block(3*prev, v, 2, 1) +  Om*Rot(phi) * om * s12;
-        x(3*i + 2, v) = om + dalpha(i);
-
-        x.block(3*i, a, 2, 1) = x.block(3*prev, a, 2, 1) +  (Om*Rot(phi) * eps - Rot(phi) * om*om) * s12;
-        x(3*i + 2, a) = eps + d2alpha(i);
-    }
-
-    return x;
 }
 
 /* opcje dla vec : {s12, s21, s1C, s2C} */
@@ -153,11 +114,26 @@ Matrix3d SAB(const std::string &_sAB_, const int id, const VectorXd &alphaAbs, c
     return SAB(_sAB_, id, alphaAbs(id), input);
 }
 
-Matrix3d dSAB(const std::string& _sAB_, const int id, const VectorXd& alphaAbs, 
-              const VectorXd& dAlphaAbs, const _input_& input) {
+Matrix3d dSAB(const std::string& _sAB_, const int id, const double& alphaAbs, 
+              const double& dAlphaAbs, const _input_& input) {
     Vector2d sAB = input.pickBodyType(id).dimensions.at(_sAB_);
     Matrix3d out = Matrix3d::Zero();
-    out.block(2, 0, 1, 2) = (-1.0) * (Rot(alphaAbs(id)) * sAB).transpose() * dAlphaAbs(id);
+    out.block(2, 0, 1, 2) = (-1.0) * (Rot(alphaAbs) * sAB).transpose() * dAlphaAbs;
+    return out;
+}
+
+Matrix3d dSAB(const std::string& _sAB_, const int id, const VectorXd& alphaAbs, 
+              const VectorXd& dAlphaAbs, const _input_& input) 
+{
+    return dSAB(_sAB_, id, alphaAbs(id), dAlphaAbs(id), input);
+}
+
+Matrix3d d2SAB(const std::string& _sAB_, const int id, const double& alphaAbs, 
+              const double& dAlphaAbs, const double& d2AlphaAbs, const _input_& input) {
+    Vector2d sAB = input.pickBodyType(id).dimensions.at(_sAB_);
+    Matrix3d out = Matrix3d::Zero();
+    out.block(2, 0, 1, 2) = (-1.0) * (Rot(alphaAbs) * sAB).transpose() * d2AlphaAbs - 
+                                  (Om*Rot(alphaAbs) * sAB).transpose() * dAlphaAbs*dAlphaAbs;
     return out;
 }
 
@@ -169,7 +145,6 @@ Matrix3d dSABdAlpha(const Vector2d& translation, const double absoluteAlpha)
 
     Matrix3d S = Matrix3d::Zero();
     S.block(2, 0, 1, 2) = (- Rot(absoluteAlpha) * translation).transpose();
-
     return S;
 }
 
@@ -192,17 +167,20 @@ Matrix3d massMatrix(const int id, const _input_& input)
     return task::M::local(id, input);
 }
 
-Vector3d Q1_init(int id, const VectorXd &alphaAbs, const _input_ &input)
+Vector3d Q1_init(int id, const VectorXd &alphaAbs, const double& u, const _input_ &input)
 {
     Vector3d Q_out = Vector3d::Zero();
     Q_out(1) = - M_GRAV * input.pickBodyType(id).m;
     Q_out = SAB("s1C", id, alphaAbs, input) * Q_out;
+    if (id == 0) Q_out(0) = u;
     return Q_out;
 }
 
 double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
     const unsigned int n = input.alpha0.size();
-    VectorXd dy = RHS_HDCA(t , y, input);
+	VectorXd U_ZERO(input.Nsamples); // quick hack: now we assume no input signal when calculating energy
+	U_ZERO.setZero();
+    VectorXd dy = RHS_HDCA(t , y, U_ZERO, input);
     VectorXd alpha  = y.tail(n);
     VectorXd dalpha = dy.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
@@ -253,9 +231,11 @@ void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
 }
 
 dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _input_& input) {
+    assert(t >= 0.0 && t <= input.Tk);
+
     /* return values at node index */
     std::pair<int,bool> indStruct = solutionFwd.atTime(t, input);
-    if (indStruct.second == NODE_VALUE )
+    if (indStruct.second == _solution_::NODE_VALUE )
         return solutionFwd.getDynamicValues(indStruct.first, input);
     
     /* interpolate via 3rd order polynomial */
@@ -306,9 +286,11 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
 }
 
 dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input) {
+    assert(t >= 0.0 && t <= input.Tk);
+
     /* return values at node index */
     std::pair<int,bool> indStruct = solutionFwd.atTime(t, input);
-    if (indStruct.second == NODE_VALUE )
+    if (indStruct.second == _solution_::NODE_VALUE )
         return solutionFwd.getDynamicValues(indStruct.first, input);
 
     /* interpolate linearly */
@@ -325,4 +307,62 @@ dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, cons
     dataInterp.lambda  = (s00.lambda  + sf1.lambda)  / 2.0;
 
     return dataInterp;
+}
+
+std::pair<int, const bool> atTime(const double& t, const VectorXd& T, const _input_& input) {
+	/* 
+	* overload metody klasy _solution_ (to do: uogolnic do statycznej metody)
+	*/
+    assert(t >= 0.0 && t <= input.Tk);
+	const double& dt = input.dt;
+    int begin = 0;
+    int end = input.Nsamples-1;
+
+	const int linearSearchRegion = 5;
+	while (end - begin > linearSearchRegion) {
+		const int mid = (begin + end) / 2;
+		if ( abs(t - T(mid)) < 1e-10 ) return std::make_pair(mid, _solution_::NODE_VALUE);
+		if (t > T(mid))		begin = mid;
+		else				end   = mid;
+	}
+
+	for (int i = begin; i <= end; i++) {
+		if ( abs(T(i) 	   - t) < 1e-10 ) return std::make_pair(i, _solution_::NODE_VALUE);
+		if ( abs(T(i)+dt/2 - t) < 1e-10 ) return std::make_pair(i, _solution_::INTERMEDIATE_VALUE);
+	}
+
+	throw std::runtime_error("atTime: index not found");
+}
+
+double interpolateControl(const double& t, const VectorXd& uVec, const _input_& input) {
+    assert(t >= 0.0 && t <= input.Tk);
+     /* return values at node index */
+    VectorXd T = VectorXd::LinSpaced(input.Nsamples, 0, input.Tk);
+    std::pair<int,bool> indStruct = atTime(t, T, input);
+    if (indStruct.second == _solution_::NODE_VALUE )
+        return uVec(indStruct.first);
+
+    /* interpolate via 3rd order polynomial */
+    int baseInd = indStruct.first;
+
+    if (baseInd == 0)
+        baseInd++;
+    else if (baseInd == input.Nsamples-2) // pre-last node
+        baseInd--;
+    double tr1 = T(baseInd-1);      double ur1 = uVec(baseInd-1);
+    double t00 = T(baseInd  );      double u00 = uVec(baseInd  );
+    double tf1 = T(baseInd+1);      double uf1 = uVec(baseInd+1);
+    double tf2 = T(baseInd+2);      double uf2 = uVec(baseInd+2);
+
+    Matrix4d nodeVals;
+    nodeVals << pow(tr1, 3), pow(tr1, 2), tr1, 1.0,
+                pow(t00, 3), pow(t00, 2), t00, 1.0,
+                pow(tf1, 3), pow(tf1, 2), tf1, 1.0,
+                pow(tf2, 3), pow(tf2, 2), tf2, 1.0;
+
+    Vector4d RHS, c;
+    RHS << ur1, u00, uf1, uf2;
+    c = nodeVals.partialPivLu().solve(RHS);
+
+    return c(0)*pow(t,3) + c(1)*pow(t,2) + c(2)*t + c(3);
 }

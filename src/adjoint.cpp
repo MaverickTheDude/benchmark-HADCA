@@ -21,15 +21,38 @@ Adjoint::~Adjoint()
 }
 
 VectorXd Adjoint::RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
-        const VectorXd& u, const VectorXd& eta, const VectorXd& ksi)
+    const VectorXd& u, const VectorXd& eta, const VectorXd& ksi)
 {
     return Adjoint(i).RHS(q, dq, lambda, u, eta, ksi);
 }
 
 VectorXd Adjoint::RHS(const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
-        const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const
+    const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const
 {
     return __RHS(input, q, dq, lambda, u, eta, ksi);
+}
+
+VectorXd Adjoint::RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi)
+{
+    return Adjoint(i).RHS(bodyNumber, q, dq, lambda, u, eta, ksi);
+}
+
+VectorXd Adjoint::RHS(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const
+{
+    return __RHS(bodyNumber, input, q, dq, lambda, u, eta, ksi);
+}
+
+VectorXd Adjoint::RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi)
+{
+    return Adjoint(i).RHS3d(bodyNumber, q, dq, lambda, u, eta, ksi);
+}
+VectorXd Adjoint::RHS3d(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const
+{
+    return __RHS3d(bodyNumber, input, q, dq, lambda, u, eta, ksi);
 }
 
 VectorXd Adjoint::__RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
@@ -43,4 +66,22 @@ VectorXd Adjoint::__RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq,
     return (h->q(q, dq) - h->ddtdq(q, dq)) - 
         (M->ddqdq(q, dq, eta) - M->ddt(q, eta) - F->dq(q, dq, u, eta)) -
         (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi));
+}
+
+VectorXd Adjoint::__RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const
+{
+    return (h->q(bodyNumber, q, dq) - h->ddtdq(bodyNumber, q, dq)) - 
+        (M->ddqdq(bodyNumber, q, dq) - M->ddt(bodyNumber, q, dq) - F->dq(bodyNumber, q, dq, u)) * eta.segment(3 * bodyNumber, 3) -
+        ((F->q(bodyNumber, q, dq, u) - F->ddtdq(bodyNumber, q, dq, u)) * ksi.segment(3 * bodyNumber, 3) - 
+        Phi->ddqddqlambda(bodyNumber, q, lambda, ksi));
+}
+
+VectorXd Adjoint::__RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const
+{   
+    return (h->q(bodyNumber, q, dq) - h->ddtdq(bodyNumber, q, dq)) - 
+        (M->ddqdq(bodyNumber, q, dq) - M->ddt(bodyNumber, q, dq) - F->dq(bodyNumber, q, dq, u)) * eta -
+        ((F->q(bodyNumber, q, dq, u) - F->ddtdq(bodyNumber, q, dq, u)) * ksi - 
+        Phi->ddqddqlambda3d(bodyNumber, q, lambda, ksi));
 }

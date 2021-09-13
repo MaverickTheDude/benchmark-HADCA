@@ -21,6 +21,26 @@ struct dataJoint {
     VectorXd pjoint;
 };
 
+struct dataAbsolute {
+	dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input);
+	inline double alphaAbs(int id)   const { return q(3*id+2); }
+	inline double dAlphaAbs(int id)  const { return dq(3*id+2); }
+	inline double d2AlphaAbs(int id) const { return dq(3*id+2); }
+
+	dataAbsolute() = default;
+	dataAbsolute(const dataAbsolute& o) = default; // copy Ctor
+	dataAbsolute(dataAbsolute&& o)      = default; // move Ctro
+	~dataAbsolute() { }
+
+	double t;
+	VectorXd q;
+	VectorXd dq;
+	VectorXd d2q;
+    VectorXd eta;
+    VectorXd ksi;
+	VectorXd lambda;
+};
+
 class _solution_{
 public:
     _solution_(const _input_& input) : T(input.Nsamples), 
@@ -68,5 +88,39 @@ public:
     MatrixXd lambda;
     MatrixXd pjoint;
     int flag;
+
+    static const bool NODE_VALUE; // wtf: zmienne statyczne definiujemy w pliku .cpp nawet jesli sa const
+    static const bool INTERMEDIATE_VALUE;
     // MatrixXd sigma;  niepotrzebne do adjointa
+};
+
+class _solutionAdj_ {
+public:
+	enum flags {active, dummy};
+    _solutionAdj_(const _input_& input) : T(VectorXd::LinSpaced(input.Nsamples, 0, input.Tk)), 
+                                     e(input.Nbodies, input.Nsamples),
+                                     c(input.Nbodies, input.Nsamples), 
+                                     norms(3, input.Nsamples), 
+                                     flag(active)
+    {   }
+    _solutionAdj_() : flag(dummy) { /* dummy structure to be passed as an argument in RHS_ADJOINT */ }
+
+	_solutionAdj_(const _solutionAdj_& o) : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag)
+	{ std::cout<<this<<'\t'<<"CCtor\n"; }
+	_solutionAdj_(_solutionAdj_&& o)      : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag)
+	{ std::cout<<this<<'\t'<<"MCtor\n"; }
+	~_solutionAdj_() {	}
+
+    void set_e(  int ind, VectorXd _e_)   { e.col(ind)   = _e_  ; }
+    void set_c(  int ind, VectorXd _c_)   { c.col(ind)   = _c_  ; }
+    void setNorms(  int ind, Vector3d _norms_)   { norms.col(ind)   = _norms_  ; }
+	bool dummySolution() const { return (flag == dummy) ? true : false; }
+    void print() const;
+
+public:
+    VectorXd T;
+    MatrixXd e;
+    MatrixXd c;
+    Matrix<double, 3, Eigen::Dynamic> norms; // vs. MatrixXd norms: czy teraz konstruktor tez przyjmuje 2 argumenty?
+    int flag;
 };
