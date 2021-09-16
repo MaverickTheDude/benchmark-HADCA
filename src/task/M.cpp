@@ -40,7 +40,10 @@ MatrixXd M::operator()(const VectorXd& q) const
 
 MatrixXd M::ddt(const VectorXd& q, const VectorXd& dq) const
 {
-    MatrixXd m = MatrixXd::Zero(3 * input.Nbodies, 3 * input.Nbodies); // It's not zero. Please, update this function in future.
+    MatrixXd m = MatrixXd::Zero(3 * input.Nbodies, 3 * input.Nbodies);
+
+    for(int i = 0; i < input.Nbodies; i++)
+        m.block(3 * i, 3 * i, 3, 3) = ddt(i, q, dq);
 
     return m;
 }

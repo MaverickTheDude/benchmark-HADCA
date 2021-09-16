@@ -524,7 +524,7 @@ void test_interpolate(void) {
 
 namespace PhiTimeDerivatives
 {
-    double test_time = 0.9;
+    double test_time = 0.12;
     double eps = 1e-6;
 
     struct data_struct
@@ -534,12 +534,45 @@ namespace PhiTimeDerivatives
         _solution_* solution;
         double t = 0.0;
 
+        bool isResponsibleForPointers = 0;
+
         data_struct() : input(NULL), Phi(NULL), solution(NULL) {}
 
         data_struct(_input_* i, task::Phi* P, _solution_* s, double test_time) :
             input(i), Phi(P), solution(s)
         {
             t = floor(test_time / input->dt) * input->dt;
+        }
+
+        data_struct(_input_* i, double test_time)
+        {
+            isResponsibleForPointers = 1;
+            input = i;
+            Phi = new task::Phi(*i);
+            solution = new _solution_(RK_solver(*input));
+            t = test_time;
+        }
+
+        data_struct& operator=(data_struct data)
+        {
+            isResponsibleForPointers = data.isResponsibleForPointers;
+            input = data.input;
+            Phi = data.Phi;
+            data.Phi = nullptr;
+            solution = data.solution;
+            data.solution = nullptr;
+            t = data.t;
+
+            return *this;
+        }
+
+        ~data_struct()
+        {
+            if(isResponsibleForPointers)
+            {
+                delete Phi;
+                delete solution;
+            }
         }
 
     } data;
@@ -615,6 +648,82 @@ namespace PhiTimeDerivatives
             TEST_CHECK_(diff.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n", diff.norm(), eps);
         }
     }
+
+    namespace constraints
+    {
+        int verbose = 1;
+        int NBodies = 10;
+        _input_ input = _input_(NBodies);
+        task::Phi Phi(input);
+
+        VectorXd dddq(double t)
+        {
+            double t_plus = t + (data.input->dt / 2);
+            double t_minus = t - (data.input->dt / 2);
+
+            VectorXd ddq_plus = ddq(t_plus);
+            VectorXd ddq_minus = ddq(t_minus);
+
+            VectorXd dddq = (ddq_plus - ddq_minus) / data.input->dt;
+
+            return dddq;
+        }
+
+        void d0dt0(void)
+        {
+            data = data_struct(&input, test_time);
+
+            VectorXd constraint_eq = Phi(q(data.t));
+
+            if(verbose)
+                printf("\nError: %.10lf (threshold: %.10lf)\n", constraint_eq.norm(), eps);
+
+            TEST_CHECK_(constraint_eq.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n",
+                constraint_eq.norm(), eps);        
+        }
+
+        void d1dt1(void)
+        {
+            data = data_struct(&input, test_time);
+
+            VectorXd constraint_eq = Phi.q(q(data.t)) * dq(data.t);
+
+            if(verbose)
+                printf("\nError: %.10lf (threshold: %.10lf)\n", constraint_eq.norm(), eps);
+
+            TEST_CHECK_(constraint_eq.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n",
+                constraint_eq.norm(), eps);        
+        }
+
+        void d2dt2(void)
+        {
+            data = data_struct(&input, test_time);
+
+            VectorXd constraint_eq = Phi.ddtq(q(data.t), dq(data.t)) * dq(data.t) +
+                Phi.q(q(data.t)) * ddq(data.t);
+
+            if(verbose)
+                printf("\nError: %.10lf (threshold: %.10lf)\n", constraint_eq.norm(), eps);
+
+            TEST_CHECK_(constraint_eq.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n",
+                constraint_eq.norm(), eps);        
+        }
+
+        void d3dt3(void)
+        {
+            data = data_struct(&input, test_time);
+
+            VectorXd constraint_eq = Phi.d2dt2q(q(data.t), dq(data.t), ddq(data.t)) * dq(data.t) +
+                2 * Phi.ddtq(q(data.t), dq(data.t)) * ddq(data.t) +
+                Phi.q(q(data.t)) * dddq(data.t);
+            
+            if(verbose)
+                printf("\nError: %.10lf (threshold: %.10lf)\n", constraint_eq.norm(), eps);
+
+            TEST_CHECK_(constraint_eq.norm() <= eps, "Error: %.10lf (threshold: %.10lf)\n",
+                constraint_eq.norm(), eps);
+        }
+    }
 }
 
 TEST_LIST = {
@@ -634,5 +743,9 @@ TEST_LIST = {
    { "interpolation", test_interpolate},
    { "Phi_ddtq", PhiTimeDerivatives::ddt::test},
    { "Phi_d2dt2q", PhiTimeDerivatives::d2dt2::test},
+   { "constraints: d0dt0", PhiTimeDerivatives::constraints::d0dt0},
+   { "constraints: d1dt1", PhiTimeDerivatives::constraints::d1dt1},
+   { "constraints: d2dt2", PhiTimeDerivatives::constraints::d2dt2},
+   { "constraints: d3dt3", PhiTimeDerivatives::constraints::d3dt3},
    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

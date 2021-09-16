@@ -64,7 +64,7 @@ VectorXd Adjoint::__RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq,
      */
 
     return (h->q(q, dq) - h->ddtdq(q, dq)) - 
-        (M->ddqdq(q, dq, eta) - M->ddt(q, eta) - F->dq(q, dq, u, eta)) -
+        (M->ddqdq(q, dq, eta) - M->ddt(q, dq, eta) - F->dq(q, dq, u, eta)) -
         (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi));
 }
 

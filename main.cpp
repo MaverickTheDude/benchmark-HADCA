@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
 	// solutionFwd.print();
 
-	_solutionAdj_ solution = RK_AdjointSolver(u0, solutionFwd,  input);
+	_solutionAdj_ solution = RK_AdjointSolver(u0, solutionFwd,  input, _solutionAdj_::HDCA);
 	solution.print();
 
 	cout << "done\n";

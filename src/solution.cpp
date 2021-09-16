@@ -74,17 +74,28 @@ void _solutionAdj_::print() const {
 	if (outFile.fail() )
 		throw std::runtime_error("nie udalo sie otworzyc pliku.");
 
-	const int N = e.cols();
-	const int n = e.rows();
-	MatrixXd sol(2*n+1 + 3, N);
-
-	sol.row(0) = T;
-	sol.block(1, 0, n, N) = e;
-	sol.block(1+n, 0, n, N) = c;
-	sol.block(1+2*n, 0, 3, N) = norms;
-
-	outFile << sol;
-	outFile.close();
+	if (HDCA_formulation) {
+		const int N = e.cols();
+		const int n = e.rows();
+		MatrixXd sol(2*n+1 + 3, N);
+		sol.row(0) = T;
+		sol.block(1, 0, n, N) = e;
+		sol.block(1+n, 0, n, N) = c;
+		sol.block(1+2*n, 0, 3, N) = norms;
+		outFile << sol;
+		outFile.close();
+	}
+	else {
+		const int N = eta.cols();
+		const int n = eta.rows();
+		MatrixXd sol(2*n+1 + 3, N);
+		sol.row(0) = T;
+		sol.block(1, 0, n, N) = eta;
+		sol.block(1+n, 0, n, N) = ksi;
+		sol.block(1+2*n, 0, 3, N) = norms;
+		outFile << sol;
+		outFile.close();
+	}
 }
 
 dataAbsolute::dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input) :
@@ -98,11 +109,11 @@ dataAbsolute::dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint
 	const VectorXd& dalpha  = data.dalpha;
 	const VectorXd& d2alpha = data.d2alpha;
 
-    q.segment(0,6)   << alpha(0),  0.0, 0.0,  alpha(0), 0.0,  alpha(1);
-	dq.segment(0,6)  << alpha(0),  0.0, 0.0,  alpha(0), 0.0,  alpha(1);
-	d2q.segment(0,6) << alpha(0),  0.0, 0.0,  alpha(0), 0.0,  alpha(1);
-	eta.segment(0,6) << e(0),  	   0.0, 0.0,  e(0),     0.0,  e(1);
-	ksi.segment(0,6) << c(0),  	   0.0, 0.0,  c(0),     0.0,  c(1);
+    q.segment(0,6)   << alpha(0),   0.0, 0.0,  alpha(0),   0.0,  alpha(1);
+	dq.segment(0,6)  << dalpha(0),  0.0, 0.0,  dalpha(0),  0.0,  dalpha(1);
+	d2q.segment(0,6) << d2alpha(0), 0.0, 0.0,  d2alpha(0), 0.0,  d2alpha(1);
+	eta.segment(0,6) << e(0),  	    0.0, 0.0,  e(0),       0.0,  e(1);
+	ksi.segment(0,6) << c(0),  	    0.0, 0.0,  c(0),       0.0,  c(1);
 
 // zrownoleglamy wszystkie obliczenia na raz
     for (int i = 2; i < input.Nbodies; i++)

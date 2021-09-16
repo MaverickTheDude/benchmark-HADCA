@@ -96,23 +96,35 @@ public:
 
 class _solutionAdj_ {
 public:
-	enum flags {active, dummy};
+	enum flags {active, dummy, HDCA, GLOBAL};
+    /* default constructor for HDCA formulation */
     _solutionAdj_(const _input_& input) : T(VectorXd::LinSpaced(input.Nsamples, 0, input.Tk)), 
-                                     e(input.Nbodies, input.Nsamples),
-                                     c(input.Nbodies, input.Nsamples), 
-                                     norms(3, input.Nsamples), 
-                                     flag(active)
+                                    e(input.Nbodies, input.Nsamples),
+                                    c(input.Nbodies, input.Nsamples), 
+                                    norms(3, input.Nsamples), flag(active),
+                                    eta(0, 0), ksi(0, 0) // this instance doesn't use eta and ksi
     {   }
+
     _solutionAdj_() : flag(dummy) { /* dummy structure to be passed as an argument in RHS_ADJOINT */ }
 
-	_solutionAdj_(const _solutionAdj_& o) : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag)
+	_solutionAdj_(const _solutionAdj_& o) : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag), eta(o.eta), ksi(o.ksi)
 	{ std::cout<<this<<'\t'<<"CCtor\n"; }
-	_solutionAdj_(_solutionAdj_&& o)      : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag)
+	_solutionAdj_(_solutionAdj_&& o)      : T(o.T), e(o.e), c(o.c), norms(o.norms), flag(o.flag), eta(o.eta), ksi(o.ksi)
 	{ std::cout<<this<<'\t'<<"MCtor\n"; }
 	~_solutionAdj_() {	}
 
+    void switchToGlobalFormulation(const _input_& input) {
+        e.resize(0, 0);
+        c.resize(0, 0);
+        eta.resize(3*input.Nbodies, input.Nsamples);
+        ksi.resize(3*input.Nbodies, input.Nsamples);
+        HDCA_formulation = false;
+    }
+
     void set_e(  int ind, VectorXd _e_)   { e.col(ind)   = _e_  ; }
     void set_c(  int ind, VectorXd _c_)   { c.col(ind)   = _c_  ; }
+    void set_eta(  int ind, VectorXd _eta_)   { eta.col(ind)   = _eta_  ; }
+    void set_ksi(  int ind, VectorXd _ksi_)   { ksi.col(ind)   = _ksi_  ; }
     void setNorms(  int ind, Vector3d _norms_)   { norms.col(ind)   = _norms_  ; }
 	bool dummySolution() const { return (flag == dummy) ? true : false; }
     void print() const;
@@ -123,4 +135,7 @@ public:
     MatrixXd c;
     Matrix<double, 3, Eigen::Dynamic> norms; // vs. MatrixXd norms: czy teraz konstruktor tez przyjmuje 2 argumenty?
     int flag;
+    MatrixXd eta;
+    MatrixXd ksi;
+    bool HDCA_formulation = true;
 };

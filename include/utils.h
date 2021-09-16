@@ -31,11 +31,13 @@ double interpolateControl(const double& t, const VectorXd& uVec, const _input_& 
 // solvers.cpp
 _solution_ RK_solver(const _input_& input);
 _solution_ RK_solver(const VectorXd& u, const _input_& input);
-_solutionAdj_ RK_AdjointSolver(const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input);
+_solutionAdj_ RK_AdjointSolver(const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input, int formulation);
 
 // RHS.cpp
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_& input);
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_& input, _solution_& solution);
 VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input);
 VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input, _solutionAdj_& solution);
-VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input);
+VectorXd RHS_ADJOINT_GLOBAL(const double& t, const VectorXd& y, const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input);
+VectorXd RHS_ADJOINT_GLOBAL(const double& t, const VectorXd& y, const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input, _solutionAdj_& solution);
+VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input, int formulation);

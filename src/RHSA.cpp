@@ -24,42 +24,6 @@ VectorXd RHS_ADJOINT(const double& tau, const VectorXd& y, const VectorXd& uVec,
     VectorXd de(n);
     const double u = interpolateControl(t, uVec, input);
 
-// test if eta/ksi are recreated correctly from B.C.
-static bool once = true;
-if (once) {
-    // std::cout << std::endl << stateAbs.eta << std::endl << std:: endl;
-    // std::cout << std::endl << stateAbs.ksi << std::endl;
-    once = false;
-
-    Vector3d H = input.pickBodyType(0).H;
-    Vector3d etaT = H * e(0);
-    Vector3d ksiT = H * c(0);
-    // std::cout << "\n\n===\n\n";
-    // std::cout << etaT << "\n\n" << ksiT << std::endl << std::endl; 
-    H = input.pickBodyType(1).H;
-
-    int prev = 0;
-    Matrix3d S12  =  SAB("s12", prev, stateAbs.q(3*prev+2), 					   input);
-    Matrix3d dS12 = dSAB("s12", prev, stateAbs.q(3*prev+2), stateAbs.dq(3*prev+2), input);
-    etaT = S12.transpose() * etaT + dS12.transpose() * ksiT + H*e(prev+1);
-    ksiT = S12.transpose() * ksiT + H*c(prev+1);
-    // std::cout << etaT << "\n\n" << ksiT << std::endl << std::endl; 
-
-    prev = 1;
-    S12  =  SAB("s12", prev, stateAbs.q(3*prev+2), 					   input);
-    dS12 = dSAB("s12", prev, stateAbs.q(3*prev+2), stateAbs.dq(3*prev+2), input);
-    etaT = S12.transpose() * etaT + dS12.transpose() * ksiT + H*e(prev+1);
-    ksiT = S12.transpose() * ksiT + H*c(prev+1);
-    // std::cout << etaT << "\n\n" << ksiT << std::endl << std::endl; 
-
-    prev = 2;
-    S12  =  SAB("s12", prev, stateAbs.q(3*prev+2), 					   input);
-    dS12 = dSAB("s12", prev, stateAbs.q(3*prev+2), stateAbs.dq(3*prev+2), input);
-    etaT = S12.transpose() * etaT + dS12.transpose() * ksiT + H*e(prev+1);
-    ksiT = S12.transpose() * ksiT + H*c(prev+1);
-    // std::cout << etaT << "\n\n" << ksiT << std::endl << std::endl; 
-}
-
     vector<vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >, aligned_allocator<AssemblyAdj> > tree;
     tree.resize(input.Ntiers);
     vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >& leafBodies = tree[0];
@@ -150,7 +114,8 @@ if (once) {
     return dy;
 }
 
-VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input) {
+
+VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input, int formulation) {
 	const int& Nbodies = input.Nbodies;
 	const int& Nconstr = input.Nconstr;
 	MatrixXd A(3*Nbodies + Nconstr, 3*Nbodies + Nconstr);
@@ -179,6 +144,13 @@ VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input)
 	adjointAbs = A.partialPivLu().solve(RHS);
 	VectorXd eta = adjointAbs.head(3*Nbodies);
 
+	if (formulation == _solutionAdj_::GLOBAL) {
+		VectorXd y(6*Nbodies);
+		y.head(3*Nbodies) = eta;
+		y.tail(3*Nbodies) = xi;
+		return y;
+	}
+
 	VectorXd e(Nbodies), c(Nbodies);
     const Vector3d Hground = input.pickBodyType(0).H;
 	e(0) = Hground.transpose() * eta.segment(0, 3);
@@ -201,4 +173,56 @@ VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input)
 	y.tail(Nbodies) = c;
 
 	return y;
+}
+
+
+VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd& uVec, const _solution_& solutionFwd, const _input_& input) {
+    _solutionAdj_ solution;
+    return RHS_ADJOINT_GLOBAL(tau, y, uVec, solutionFwd, input, solution);
+}
+
+VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd& uVec,
+                     const _solution_& solutionFwd, const _input_& input, _solutionAdj_& solution) {
+	const int& Nbodies = input.Nbodies;
+	const int& Nconstr = input.Nconstr;
+	const double t = input.Tk - tau;
+    const unsigned int n = y.size()/2; // = 3*Nbodies
+    VectorXd eta = y.head(n);
+    VectorXd ksi = y.tail(n);
+    dataJoint state = interpolate(t, solutionFwd, input);
+    dataAbsolute stateAbs = dataAbsolute(VectorXd::Zero(Nbodies), VectorXd::Zero(Nbodies), state, input);
+    const double u = interpolateControl(t, uVec, input);
+    
+	Adjoint derivatives(input); 
+	MatrixXd A = MatrixXd::Zero(n + Nconstr, n + Nconstr);
+	A.block(0, 0, n, n) = derivatives.M->operator()(stateAbs.q);
+	A.block(0, n, n, Nconstr) = derivatives.Phi->q(stateAbs.q).transpose();
+	A.block(n, 0, Nconstr, n) = derivatives.Phi->q(stateAbs.q);
+	VectorXd RHS = VectorXd::Zero(n + Nconstr);
+	RHS.head(n) = derivatives.RHS(stateAbs.q, stateAbs.dq, stateAbs.lambda, (VectorXd(1) << u).finished(), eta, ksi);
+	RHS.tail(Nconstr) = 2 * derivatives.Phi->ddtq(stateAbs.q, stateAbs.dq) * eta +
+                			derivatives.Phi->d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * ksi;
+	VectorXd adjointAbs = A.partialPivLu().solve(RHS);
+	VectorXd deta = adjointAbs.head(n);
+
+	VectorXd dy(2*n);
+	dy.head(n) = deta;
+	dy.tail(n) = -eta;
+
+    if (solution.dummySolution())
+        return dy;
+
+    const int ind = atTime(t, solutionFwd.T, input).first;
+
+    task::Phi Phi(input);
+    Vector3d norms;
+    norms(0) = (Phi.q(stateAbs.q) * ksi).norm();
+    norms(1) = (Phi.q(stateAbs.q) * eta + Phi.ddtq(stateAbs.q, stateAbs.dq) * ksi).norm();
+    norms(2) = (Phi.q(stateAbs.q) * deta - 2 * Phi.ddtq(stateAbs.q, stateAbs.dq) * eta  -
+                Phi.d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * ksi ).norm();
+
+    solution.set_ksi(ind, ksi);
+    solution.set_eta(ind, eta);
+    solution.setNorms(ind, norms);
+    return dy;
 }

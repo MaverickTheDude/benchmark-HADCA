@@ -12,7 +12,9 @@ using namespace Eigen;
 
 class Adjoint
 {
-friend VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input);
+friend VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input, int formulation);
+friend VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd& uVec,
+                     const _solution_& solutionFwd, const _input_& input, _solutionAdj_& solution);
 public:
     Adjoint(const _input_& i);
     Adjoint() = delete;
