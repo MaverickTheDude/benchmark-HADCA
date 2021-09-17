@@ -66,6 +66,11 @@ void _solution_::print() const {
 }
 
 void _solutionAdj_::print() const {
+	if (HDCA_formulation)	printHDCA();
+	else					printGlobal();
+}
+
+void _solutionAdj_::printHDCA() const {
 
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
 	std::ofstream outFile;
@@ -74,28 +79,35 @@ void _solutionAdj_::print() const {
 	if (outFile.fail() )
 		throw std::runtime_error("nie udalo sie otworzyc pliku.");
 
-	if (HDCA_formulation) {
-		const int N = e.cols();
-		const int n = e.rows();
-		MatrixXd sol(2*n+1 + 3, N);
-		sol.row(0) = T;
-		sol.block(1, 0, n, N) = e;
-		sol.block(1+n, 0, n, N) = c;
-		sol.block(1+2*n, 0, 3, N) = norms;
-		outFile << sol;
-		outFile.close();
-	}
-	else {
-		const int N = eta.cols();
-		const int n = eta.rows();
-		MatrixXd sol(2*n+1 + 3, N);
-		sol.row(0) = T;
-		sol.block(1, 0, n, N) = eta;
-		sol.block(1+n, 0, n, N) = ksi;
-		sol.block(1+2*n, 0, 3, N) = norms;
-		outFile << sol;
-		outFile.close();
-	}
+	const int N = e.cols();
+	const int n = e.rows();
+	MatrixXd sol(2*n+1 + 3, N);
+	sol.row(0) = T;
+	sol.block(1, 0, n, N) = e;
+	sol.block(1+n, 0, n, N) = c;
+	sol.block(1+2*n, 0, 3, N) = norms;
+	outFile << sol;
+	outFile.close();
+}
+
+void _solutionAdj_::printGlobal() const {
+
+	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
+	std::ofstream outFile;
+	outFile.open("../output/resultsAdjointGlobal.txt");
+
+	if (outFile.fail() )
+		throw std::runtime_error("nie udalo sie otworzyc pliku.");
+
+	const int N = eta.cols();
+	const int n = eta.rows();
+	MatrixXd sol(2*n+1 + 3, N);
+	sol.row(0) = T;
+	sol.block(1, 0, n, N) = eta;
+	sol.block(1+n, 0, n, N) = ksi;
+	sol.block(1+2*n, 0, 3, N) = norms;
+	outFile << sol;
+	outFile.close();
 }
 
 dataAbsolute::dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input) :

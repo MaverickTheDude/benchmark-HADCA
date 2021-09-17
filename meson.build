@@ -3,7 +3,6 @@
 project('example', 'cpp', default_options: ['backend_startup_project=main'])
 sourcelist = ['src/assembly.cpp',
     'src/body.cpp',
-    'src/derivatives.cpp',
     'src/input.cpp',
     'src/ksiCoefs.cpp',
     'src/utils.cpp',

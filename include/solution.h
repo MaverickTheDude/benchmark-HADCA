@@ -25,7 +25,7 @@ struct dataAbsolute {
 	dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input);
 	inline double alphaAbs(int id)   const { return q(3*id+2); }
 	inline double dAlphaAbs(int id)  const { return dq(3*id+2); }
-	inline double d2AlphaAbs(int id) const { return dq(3*id+2); }
+	inline double d2AlphaAbs(int id) const { return d2q(3*id+2); }
 
 	dataAbsolute() = default;
 	dataAbsolute(const dataAbsolute& o) = default; // copy Ctor
@@ -128,6 +128,8 @@ public:
     void setNorms(  int ind, Vector3d _norms_)   { norms.col(ind)   = _norms_  ; }
 	bool dummySolution() const { return (flag == dummy) ? true : false; }
     void print() const;
+    void printGlobal() const;
+    void printHDCA() const;
 
 public:
     VectorXd T;

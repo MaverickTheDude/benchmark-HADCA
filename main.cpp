@@ -18,11 +18,15 @@ int main(int argc, char* argv[]) {
 	u0.setZero();
 
 	_solution_ solutionFwd = RK_solver(u0, input);
-
 	// solutionFwd.print();
 
-	_solutionAdj_ solution = RK_AdjointSolver(u0, solutionFwd,  input, _solutionAdj_::HDCA);
-	solution.print();
+	{
+		_solutionAdj_ solution = RK_AdjointSolver(u0, solutionFwd,  input, _solutionAdj_::HDCA);
+		solution.print();
+	}
+
+	_solutionAdj_ solutionG = RK_AdjointSolver(u0, solutionFwd,  input, _solutionAdj_::GLOBAL);
+	solutionG.print();
 
 	cout << "done\n";
 	return 0;
