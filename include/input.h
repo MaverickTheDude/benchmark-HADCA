@@ -1,8 +1,6 @@
 #pragma once
 
 #include "body.h"
-#include "input.h"
-
 #include "../Eigen/Dense"
 #include "../Eigen/StdVector"
 

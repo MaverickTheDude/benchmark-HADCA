@@ -27,6 +27,7 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
 dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input);
 std::pair<int, const bool> atTime(const double& t, const VectorXd& T, const _input_& input);
 double interpolateControl(const double& t, const VectorXd& uVec, const _input_& input);
+double trapz(const VectorXd& x, const _input_& input);
 
 // solvers.cpp
 _solution_ RK_solver(const _input_& input);

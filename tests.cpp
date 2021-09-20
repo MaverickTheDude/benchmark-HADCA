@@ -754,6 +754,18 @@ namespace PhiTimeDerivatives
     }
 }
 
+void test_trapz(void) {
+    _input_ input(2); // dummy structure to extract Nsamples
+    VectorXd f(input.Nsamples);
+    for (int i = 0; i < input.Nsamples; ++i) {
+        double t = i*input.dt;
+        f(i) = 4.0 / (1.0 + t * t);
+    }
+    double integrated = trapz(f, input);
+    double diff = integrated - M_PI;
+
+    TEST_CHECK_(diff <= eps, "error = %f", diff);
+}
 
 TEST_LIST = {
    { "phi", basicPhiTests::test_Phi },
@@ -776,5 +788,6 @@ TEST_LIST = {
    { "constraints: d1dt1", PhiTimeDerivatives::constraints::d1dt1},
    { "constraints: d2dt2", PhiTimeDerivatives::constraints::d2dt2},
    { "constraints: d3dt3", PhiTimeDerivatives::constraints::d3dt3},
-   { NULL, NULL }     /* zeroed record marking the end of the list */
+    { "trapz", test_trapz},
+    { NULL, NULL }     /* zeroed record marking the end of the list */
 };

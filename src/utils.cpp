@@ -366,3 +366,14 @@ double interpolateControl(const double& t, const VectorXd& uVec, const _input_& 
 
     return c(0)*pow(t,3) + c(1)*pow(t,2) + c(2)*t + c(3);
 }
+
+double trapz(const VectorXd& x, const _input_& input) {
+    /* Numeric trapezoidal integration: * * * * *  ...  *     * 
+     *                                  0 1 2 3 4     (N-2) (N-1)
+     * x1 to x(N-2) times dt. Border nodes times dt/2  */
+    const int N = x.size();
+    const double& dt = input.dt;
+    double out = dt * x.segment(1, N-2).sum();
+    out += (x(0)+x(N-1))*dt/2;
+    return out;
+}

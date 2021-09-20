@@ -53,6 +53,7 @@
         "sparse": "cpp",
         "ctime": "cpp",
         "iomanip": "cpp",
-        "dense": "cpp"
+        "dense": "cpp",
+        "stdvector": "cpp"
     }
 }

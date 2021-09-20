@@ -79,6 +79,7 @@ public:
     void setLambda( int ind, VectorXd _lambda_)  { lambda.col(ind)  = _lambda_ ; }
     bool dummySolution() const { return (flag == dummy) ? true : false; }
     void print() const;
+    void print(const VectorXd& u) const;
 
 public:
     VectorXd T;

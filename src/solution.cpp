@@ -58,8 +58,30 @@ void _solution_::print() const {
 	MatrixXd sol(2*n+1, N);
 
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = d2alpha;
+	sol.block(1, 0, n, N) = dalpha;
 	sol.block(1+n, 0, n, N) = alpha;
+
+	outFile << sol;
+	outFile.close();
+}
+
+void _solution_::print(const VectorXd& u) const {
+
+	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
+	std::ofstream outFile;
+	outFile.open("../output/results.txt");
+
+	if (outFile.fail() )
+		throw std::runtime_error("nie udalo sie otworzyc pliku.");
+
+	const int N = alpha.cols();
+	const int n = alpha.rows();
+	MatrixXd sol(2*n+2, N);
+
+	sol.row(0) = T;
+	sol.block(1, 0, n, N) = dalpha;
+	sol.block(1+n, 0, n, N) = alpha;
+	sol.row(2*n+1) = u;
 
 	outFile << sol;
 	outFile.close();
