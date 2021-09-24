@@ -44,6 +44,20 @@ dataJoint _solution_::getDynamicValues(const int index, const _input_& input) co
 	return data;
 }
 
+void _solution_::show_xStatus(const VectorXd& u, const _input_& input) const {
+	double mean, rms, min, max, max_u;
+	const VectorXd& x0 = alpha.row(0);
+	mean = x0.mean();
+	rms = sqrt(x0.array().square().sum() / input.Nsamples);
+	min = x0.minCoeff();
+	max = x0.maxCoeff();
+	max_u = u.array().abs().maxCoeff();
+	std::cout 	<< "---results:---"
+				<< "\nmean  = " << mean  << "\nRMS   = " << rms
+				<< "\nmin   = " << min   << "\nmax   = " << max 
+				<< "\nmax u = " << max_u << std::endl;
+}
+
 void _solution_::print() const {
 
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");

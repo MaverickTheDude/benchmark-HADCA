@@ -128,7 +128,7 @@ VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input,
 	
 	// velocity condition
 	VectorXd RHS = VectorXd::Zero(3*Nbodies+Nconstr);
-	RHS(0) = 0.0 * stateAbs.dq(0);
+	RHS(0) = input.w_Sdq * 2.0 * stateAbs.dq(0);
 	VectorXd adjointAbs = A.partialPivLu().solve(RHS);
 	VectorXd xi = -1.0 * adjointAbs.head(3*Nbodies);
 	VectorXd nu = adjointAbs.tail(Nconstr);
@@ -138,8 +138,10 @@ VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input,
 
 	// position condition
 	VectorXd Sq  = VectorXd::Zero(3*Nbodies);
-	Sq(0) = 0.0 * stateAbs.q(0); // to do: 1) dopisac do cost-fun, 2) zapisac na zewnatrz (warto?)
-	RHS.head(3*Nbodies) = Sq + added;
+	VectorXd h_dq = derivatives.h->dq(stateAbs.q, stateAbs.dq);
+	// h_1::dq(const VectorXd& q, const VectorXd& dq)
+	Sq(0) = input.w_Sq * 2.0 * stateAbs.q(0);
+	RHS.head(3*Nbodies) = Sq + h_dq + added;
 	RHS.tail(Nconstr) = added2;
 	adjointAbs = A.partialPivLu().solve(RHS);
 	VectorXd eta = adjointAbs.head(3*Nbodies);
@@ -199,7 +201,7 @@ VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd
 	A.block(0, n, n, Nconstr) = derivatives.Phi->q(stateAbs.q).transpose();
 	A.block(n, 0, Nconstr, n) = derivatives.Phi->q(stateAbs.q);
 	VectorXd RHS = VectorXd::Zero(n + Nconstr);
-	RHS.head(n) = derivatives.RHS(stateAbs.q, stateAbs.dq, stateAbs.lambda, (VectorXd(1) << u).finished(), eta, ksi);
+	RHS.head(n) = derivatives.RHS(stateAbs.q, stateAbs.dq, stateAbs.d2q, stateAbs.lambda, (VectorXd(1) << u).finished(), eta, ksi);
 	RHS.tail(Nconstr) = 2 * derivatives.Phi->ddtq(stateAbs.q, stateAbs.dq) * eta +
                 			derivatives.Phi->d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * ksi;
 	VectorXd adjointAbs = A.partialPivLu().solve(RHS);

@@ -80,6 +80,7 @@ public:
     bool dummySolution() const { return (flag == dummy) ? true : false; }
     void print() const;
     void print(const VectorXd& u) const;
+    void show_xStatus(const VectorXd& u, const _input_& input) const;
 
 public:
     VectorXd T;

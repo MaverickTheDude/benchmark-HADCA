@@ -54,6 +54,10 @@
         "ctime": "cpp",
         "iomanip": "cpp",
         "dense": "cpp",
-        "stdvector": "cpp"
+        "stdvector": "cpp",
+        "cassert": "cpp",
+        "cerrno": "cpp",
+        "cfloat": "cpp",
+        "climits": "cpp"
     }
 }

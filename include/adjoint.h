@@ -22,19 +22,20 @@ public:
     Adjoint(const Adjoint&) = delete;
     Adjoint& operator=(const Adjoint&) = delete;
 
-    static VectorXd RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    static VectorXd RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const VectorXd& eta, const VectorXd& ksi);
-    VectorXd RHS(const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    VectorXd RHS(const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
 
-    static VectorXd RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    static VectorXd RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi);
-    VectorXd RHS(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    VectorXd RHS(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
 
-    static VectorXd RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    static VectorXd RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi);
-    VectorXd RHS3d(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+//z ciekawosci: po co sa te statyczne metody?
+    VectorXd RHS3d(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const;
 
 private:
@@ -44,10 +45,10 @@ private:
     const task::M* M;
     const task::Phi* Phi;
 
-    VectorXd __RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& lambda,
+    VectorXd __RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
-    VectorXd __RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    VectorXd __RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
-    VectorXd __RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq,
+    VectorXd __RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const;
 };

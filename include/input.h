@@ -22,10 +22,6 @@ namespace PhiTimeDerivatives
 class _input_ {
 public:
 friend void PhiTimeDerivatives::constraints::setStartConditions(_input_ &input);
-    // _input_() {
-    //     sA1(2.0, 0.0); << runtime error bo sA1 juz zdazylo powstac. Czy to nie powinno rzucac bledu przy kompilacji?
-    //     sA2(3.0, 0.0);
-    // }
     _input_(int Nbodies);
     ~_input_();
     body pickBodyType(int bodyId) const {
@@ -41,6 +37,10 @@ public:
     const int Nsamples, Ntiers;
     int* tiersInfo;
     const bool logEnergy;
+    double w_hq  = 1.0;
+    double w_hdq = 0.0;
+    double w_Sq  = 0.0;
+    double w_Sdq = 0.0;
 
 private:
     void setPJointAndSigma(void);

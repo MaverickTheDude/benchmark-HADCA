@@ -22,12 +22,12 @@ namespace task
         virtual double operator()(const VectorXd& q, const VectorXd& dq) const = 0;
         virtual VectorXd q(const VectorXd& q, const VectorXd& dq) const = 0;
         virtual VectorXd dq(const VectorXd& q, const VectorXd& dq) const = 0;
-        virtual VectorXd ddtdq(const VectorXd& q, const VectorXd& dq) const = 0;
+        virtual VectorXd ddtdq(const VectorXd& q, const VectorXd& dq, const VectorXd& d2q) const = 0;
 
         virtual double operator()(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const = 0;
         virtual VectorXd q(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const = 0;
         virtual VectorXd dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const = 0;
-        virtual VectorXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const = 0;
+        virtual VectorXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q) const = 0;
 
     protected:
         const _input_& input;
@@ -39,24 +39,25 @@ namespace task
     public:
         h_1() = delete;
         h_1(const _input_& i);
-        h_1(const _input_& i, double _alpha);
+        // h_1(const _input_& i, double _alpha);
         ~h_1() = default;
         h_1(const h_1&) = delete;
         h_1& operator=(const h_1&) = delete;
 
-        void setAlpha(double _alpha);
+        // void setAlpha(double _alpha);
 
         double operator()(const VectorXd& q, const VectorXd& dq) const;
         VectorXd q(const VectorXd& q, const VectorXd& dq) const;
         VectorXd dq(const VectorXd& q, const VectorXd& dq) const;
-        VectorXd ddtdq(const VectorXd& q, const VectorXd& dq) const;
+        VectorXd ddtdq(const VectorXd& q, const VectorXd& dq, const VectorXd& d2q) const;
 
         double operator()(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const;
         VectorXd q(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const;
         VectorXd dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const;
-        VectorXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq) const;
+        VectorXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q) const;
 
     private:
-        double alpha;
+        double alpha; // = input.w_hq
+        double beta;  // = input.w_hdq
     };
 }

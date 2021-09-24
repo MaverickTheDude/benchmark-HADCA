@@ -5,7 +5,7 @@
 
 using namespace Eigen;
 
-const double _L_ = 1.0;
+const double _L_ = 0.25;
 const double _m_box_ = 0.8;
 const double _J_box_ = 0.0833;
 const double _m_link_ = 0.4;
