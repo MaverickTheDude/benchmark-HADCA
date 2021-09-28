@@ -19,16 +19,17 @@ int main(int argc, char* argv[]) {
     /* SETTINGS */
     const int Nbodies = 4;
     double inputSignal = 2.0;
-    double w_hq = 1, w_hdq = 0.0;
-    double lb = -10.0, ub = 10.0;
+    double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0001;
+    double lb = -HUGE_VAL, ub = HUGE_VAL;
 
     /* initialize */
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
     _solution_ solutionFwd = RK_solver(u_zero, *input);
     solutionFwd.show_xStatus(u_zero, *input);
-    input->w_hq  = w_hq;
-    input->w_hdq = w_hdq;
+    input->w_hq   = w_hq;
+    input->w_hdq  = w_hdq;
+    input->w_hsig = w_hsig;
 
 #if false // check adjoint equations or initial setup
     // solutionFwd.print(); // dla porownania
@@ -95,19 +96,21 @@ static double costFunction(unsigned int n, const double *x, double *grad, void *
     Map<const VectorXd> u(x, input->Nsamples);
 	_solution_ solutionFwd = RK_solver(u, *input);
 
+    const double& x_tf = solutionFwd.alpha(0, input->Nsamples-1);
+    double S_tf  = input->w_Sq * x_tf * x_tf;
+    double alpha = input->w_hq, beta = input->w_hdq; double gama = input->w_hsig;
+
     if (grad) {
     	_solutionAdj_ solution = RK_AdjointSolver(u, solutionFwd, *input, _solutionAdj_::HDCA);
         for (int i = 0; i < input->Nsamples; i++)
-            grad[i] = -1.0*input->dt * solution.c(0,i);
+            grad[i] =( 2*gama*u(i) - solution.c(0,i) ) * input->dt;
         cout << "grad evaluation " << endl;
     }
     
-    const double& x_tf = solutionFwd.alpha(0, input->Nsamples-1);
-    double S_tf  = input->w_Sq * x_tf * x_tf;
-    double alpha = input->w_hq, beta = input->w_hdq;
     /* (1) manual convertion to array (2) automtic conv. to Vector via operator= */
     VectorXd expr = alpha * solutionFwd.alpha.row(0).array().square()
                   + beta  * solutionFwd.dalpha.row(0).array().square();
+                  + gama  * u.array().square();
     double f = trapz(expr, *input) + S_tf;
 
     static int cnt = 1;

@@ -39,9 +39,9 @@ public:
     const bool logEnergy;
     double w_hq  = 1.0;
     double w_hdq = 0.0;
+    double w_hsig= 0.0;
     double w_Sq  = 0.0;
     double w_Sdq = 0.0;
-
 private:
     void setPJointAndSigma(void);
 };

@@ -37,7 +37,7 @@ VectorXd h_1::dq(const VectorXd& q, const VectorXd& dq) const
 VectorXd h_1::ddtdq(const VectorXd& q, const VectorXd& dq, const VectorXd& d2q) const
 {
     VectorXd h_1_ddtdq = VectorXd::Zero(3 * input.Nbodies);  
-    h_1_ddtdq(0) = 2 * beta * d2q(0);  // WARNING: tutaj powinno byc przyspieszenie
+    h_1_ddtdq(0) = 2 * beta * d2q(0);
 
     return h_1_ddtdq;
 }
@@ -68,7 +68,7 @@ VectorXd h_1::ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq,
 {
     Vector3d h_1_ddtdq = Vector3d::Zero();
     if(bodyNumber == 0)
-        h_1_ddtdq(0) = 2 * beta * d2q(0); // WARNING: tutaj powinno byc przyspieszenie
+        h_1_ddtdq(0) = 2 * beta * d2q(0);
 
     return h_1_ddtdq;
 }
