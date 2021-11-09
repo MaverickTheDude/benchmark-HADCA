@@ -38,6 +38,16 @@ ksi_coefs::ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjo
     i20 = M2.ldlt().solve(rhs20);
 }
 
+ksi_coefs& ksi_coefs::operator=(const ksi_coefs& ksi) {
+    i11 = ksi.i11;
+    i12 = ksi.i12;
+    i21 = ksi.i21;
+    i22 = ksi.i22;
+    i10 = ksi.i10;
+    i20 = ksi.i20;
+    return *this;
+}
+
 ksi_coefs::ksi_coefs(const ksi_coefs& ksiA, const ksi_coefs& ksiB) {
     Matrix<double, 3,2> D; // hardcoded, poniewaz D_trans wystepuje tylko w BBC
     D << 1, 0, 0, 1, 0, 0; // D_rot

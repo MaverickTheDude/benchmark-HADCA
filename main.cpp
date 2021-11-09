@@ -9,6 +9,7 @@
 #include <nlopt.hpp>
 #include <iomanip>
 #include <Eigen/StdVector> // zamiast <vector> (to chyba to samo z dodatkowym paddingiem dla pamieci?)
+#include <omp.h>
 
 using namespace Eigen;
 using std::cout;
@@ -16,6 +17,16 @@ using std::endl;
 static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data);
 
 int main(int argc, char* argv[]) {
+# ifdef _OPENMP
+#pragma omp parallel
+{
+    if (omp_get_thread_num() == 0)
+        cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads." << endl;
+} //end pragma omp
+# else
+    cout << "Caution: Your sourcecode was compiled without switching OpenMP on" << endl;
+# endif
+
     /* SETTINGS */
     const int Nbodies = 4;
     double inputSignal = 2.0;
@@ -31,8 +42,14 @@ int main(int argc, char* argv[]) {
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
+// https://stackoverflow.com/questions/58624914/using-natvis-file-to-visualise-c-objects-in-vs-code
+// https://github.com/cdcseacave/Visual-Studio-Visualizers
+    VectorXd xxx(4);
+
+    xxx << 1, 0, M_PI, M_PI_2; // to delete. Czemu ten .natvis nie dziala...
+
 #if false // check adjoint equations or initial setup
-    // solutionFwd.print(); // dla porownania
+    solutionFwd.print(); // dla porownania
 	{
 		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();

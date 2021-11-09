@@ -16,15 +16,23 @@ sourcelist = ['src/assembly.cpp',
     'src/solvers.cpp',
     'src/RHSA.cpp']
 
+# Add openmp support. Note: tdhis can be done with a single dependency, but we keep verbose version to show more syntax
+# https://mesonbuild.com/Adding-arguments.html
+# https://stackoverflow.com/questions/45465892/how-to-use-openmp-in-a-c-project-built-with-meson
+add_project_arguments('-fopenmp', language : 'cpp')
+
 # https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 cc = meson.get_compiler('cpp')
 dep1 = cc.find_library('m')
 dep2 = cc.find_library('nlopt', dirs : '/usr/local/lib/')
+libgomp = cc.find_library('gomp')
+openmp = dependency('openmp')
 
-executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2])
+executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp],
+            cpp_args : '-fopenmp')#, link_args : '-fopenmp' )
 
 # tests:
-e = executable('tests', 'tests.cpp', sources : sourcelist)
+e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : openmp)
 test('unitTest', e)
 
 # Jacobi matrices building performance test

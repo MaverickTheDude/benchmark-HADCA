@@ -18,9 +18,9 @@ public:
     Vector3d calculate_dETA2() const;
     void setAll(const AssemblyAdj&);
 
-public: // to do: set private
-    const ksi_coefs ksi;
-    AssemblyAdj * const ptrAsmA, * const ptrAsmB; // const jest tentatywny
+private:
+    /*const*/ ksi_coefs ksi;
+    AssemblyAdj * /*const*/ ptrAsmA, * /*const*/ ptrAsmB;
     Vector3d T1, T2;
 };
 
@@ -30,6 +30,8 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const double& u, const _input_& input);
     Assembly(Assembly& AsmA, Assembly& AsmB);
+    Assembly();
+    Assembly& operator=(const Assembly&);
     void connect_base_body();
     void disassembleAll();
     Vector3d calculate_V1() const;
@@ -46,11 +48,14 @@ public:
     Vector3d calculate_dV1() const;
     Vector3d calculate_dV2() const;
 
-public: // to do: set private
-    const ksi_coefs ksi;
-    const Vector3d Q1Acc;
-    const Matrix3d S12;
-    Assembly * const ptrAsmA, * const ptrAsmB; // const jest tentatywny
+friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_&, _solution_&);
+friend void test_SetAssembly(void);
+private:
+    /* const correctness fails when we want to use std::copy inside std::vector */
+    /*const*/ ksi_coefs ksi;
+    /*const*/ Vector3d Q1Acc;
+    /*const*/ Matrix3d S12;
+    Assembly * /*const*/ ptrAsmA, * /*const*/ ptrAsmB;
     Vector3d T1, T2, Q1Art, Q2Art;
 
     /* acceleration level attributes */

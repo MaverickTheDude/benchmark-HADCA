@@ -26,6 +26,23 @@ static Matrix3d massMatrixDot(const std::string &_sAB_, const int id,
 	return dM;
 }
 
+/* default constructor needed to call vector<Assembly>.resize() */
+Assembly::Assembly() :
+    ksi(ksi_coefs()) ,
+    Q1Acc(Vector3d()) ,
+    S12(Matrix3d()) ,
+    ptrAsmA(nullptr), ptrAsmB(nullptr)  { }
+	
+/* copy constructor needed to call std::copy(vectors in a tree). The default is 'delete' */
+Assembly& Assembly::operator=(const Assembly& A) {
+	ksi = A.ksi;
+	Q1Acc = A.Q1Acc;
+	S12 = A.S12;
+	ptrAsmA = A.ptrAsmA;
+	ptrAsmB = A.ptrAsmB;
+	return *this;
+}
+
 Assembly::Assembly(const int id, const VectorXd& alphaAbs, 
             const VectorXd& pjoint, const double& u, const _input_& input) :
     ksi(ksi_coefs(id, alphaAbs, pjoint, input)) ,

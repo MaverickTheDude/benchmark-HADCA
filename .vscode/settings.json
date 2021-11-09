@@ -59,5 +59,6 @@
         "cerrno": "cpp",
         "cfloat": "cpp",
         "climits": "cpp"
-    }
+    },
+    "cmake.configureOnOpen": false
 }

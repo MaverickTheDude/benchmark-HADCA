@@ -3,6 +3,7 @@
 #include "../Eigen/Dense"
 #include "../include/assembly.h"
 #include "../include/solution.h"
+#include <omp.h>
     #include <iostream>
 using std::vector;
 
@@ -19,21 +20,53 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     VectorXd dalpha(n), dpjoint(n);
     const double u = interpolateControl(t, uVec, input);
 
-    // vector<vector<Assembly>> tree;
-    vector<vector<Assembly, aligned_allocator<Assembly> >, aligned_allocator<Assembly> > tree;
-    tree.resize(input.Ntiers); // note: resize() zawiera juz w sobie reserve (?)
-    vector<Assembly, aligned_allocator<Assembly> >& leafBodies = tree[0];
-    leafBodies.reserve(input.tiersInfo[0]);
+    using aaA = aligned_allocator<Assembly>;
+    vector<vector<Assembly, aaA >, aaA > tree;
+    tree.resize(input.Ntiers);
+    vector<Assembly, aaA >& leafBodies = tree[0];
+    leafBodies.resize(input.tiersInfo[0]);
 
-// TODO: parallelize
     /* Initialize leaf bodies (baza indukcyjna) */
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
-    for (int i = 0; i < input.Nbodies; i++)
-        leafBodies.emplace_back(i, alphaAbs, pjoint, u, input);
+    // https://stackoverflow.com/a/18671256/4283100
+// for (int i = 0; i < input.Nbodies; i++)
+// leafBodies.emplace_back(i, alphaAbs, pjoint, u, input);
+
+size_t *prefix;
+#pragma omp parallel
+{
+    int ithread = 0, nthreads = 1;
+# ifdef _OPENMP
+    ithread  = omp_get_thread_num();
+    nthreads = omp_get_num_threads();
+# endif
+#pragma omp single
+    {
+        prefix = new size_t[nthreads+1];
+        prefix[0] = 0;
+    }
+    vector<Assembly, aaA > vec_private;
+#pragma omp for schedule(static) nowait
+    for(int i = 0; i < input.Nbodies; i++) {
+        vec_private.emplace_back(i, alphaAbs, pjoint, u, input);
+    }
+    prefix[ithread+1] = vec_private.size();
+#pragma omp barrier
+#pragma omp single
+{
+    for(int i=1; i<(nthreads+1); i++) prefix[i] += prefix[i-1];
+} // implicit barrier
+    auto dest_iter = std::next(leafBodies.begin(), prefix[ithread]);
+    std::copy(vec_private.begin(), vec_private.end(), dest_iter );
+}
+    delete[] prefix;
+
+
+
 
     for (int i = 1; i < input.Ntiers; i++) {
-        vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];
-        vector<Assembly, aligned_allocator<Assembly> >& upperBranch = tree[i-1];
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
         branch.reserve(input.tiersInfo[i]);
         const int endOfBranch = input.tiersInfo[i-1] - 1;
 
@@ -128,8 +161,8 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
         
 
     for (int i = 1; i < input.Ntiers; i++) {
-        vector<Assembly, aligned_allocator<Assembly> >& branch = tree[i];
-        vector<Assembly, aligned_allocator<Assembly> >& upperBranch = tree[i-1];
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
         const int endOfBranch = input.tiersInfo[i-1] - 1;
         int branchIndex = 0;
 

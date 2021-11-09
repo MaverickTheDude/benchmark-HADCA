@@ -3,6 +3,8 @@
     "configurations": [
         {
             "name": "Debug with Meson",
+            "visualizerFile": "${workspaceFolder}/Eigen/Eigen.natvis",
+            "showDisplayString": true,
             "type": "cppdbg",
             "request": "launch",
             "target": "./builddir/main",

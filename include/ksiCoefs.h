@@ -11,6 +11,8 @@ class ksi_coefs {
 	friend class Assembly;
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	ksi_coefs() = default;
+	ksi_coefs& operator=(const ksi_coefs&);
     ksi_coefs(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const _input_& input);
     ksi_coefs(const ksi_coefs& ksiA, const ksi_coefs& ksiB);
 	ksi_coefs(const int id, const dataAbsolute& data, const double& u, const _input_& input);
