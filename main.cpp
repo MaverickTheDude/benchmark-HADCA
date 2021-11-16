@@ -10,6 +10,11 @@
 #include <iomanip>
 #include <Eigen/StdVector> // zamiast <vector> (to chyba to samo z dodatkowym paddingiem dla pamieci?)
 #include <omp.h>
+// export OMP_NUM_THREADS=4
+
+// .natvis (Eigen visualization on debug): broken
+// https://stackoverflow.com/questions/58624914/using-natvis-file-to-visualise-c-objects-in-vs-code
+// https://github.com/cdcseacave/Visual-Studio-Visualizers
 
 using namespace Eigen;
 using std::cout;
@@ -42,13 +47,7 @@ int main(int argc, char* argv[]) {
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-// https://stackoverflow.com/questions/58624914/using-natvis-file-to-visualise-c-objects-in-vs-code
-// https://github.com/cdcseacave/Visual-Studio-Visualizers
-    VectorXd xxx(4);
-
-    xxx << 1, 0, M_PI, M_PI_2; // to delete. Czemu ten .natvis nie dziala...
-
-#if false // check adjoint equations or initial setup
+#if true // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
 	{
 		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
@@ -58,7 +57,7 @@ int main(int argc, char* argv[]) {
 	solutionG.print();
 #endif
 
-#if true // optimize
+#if false // optimize
     nlopt::opt opt(nlopt::LD_MMA, input->Nsamples); // LD_SLSQP  LD_MMA  LD_CCSAQ  AUGLAG  G_MLSL_LDS (useless: GN_DIRECT_L, GN_ISRES)
     opt.set_xtol_rel(1e-4);
     opt.set_maxeval(100);

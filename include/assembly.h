@@ -31,6 +31,7 @@ public:
     Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const double& u, const _input_& input);
     Assembly(Assembly& AsmA, Assembly& AsmB);
     Assembly();
+    Assembly(const Assembly&) = default; // note: shallow copy with default ctor is exactly what we need
     Assembly& operator=(const Assembly&);
     void connect_base_body();
     void disassembleAll();

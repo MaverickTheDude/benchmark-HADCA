@@ -49,6 +49,7 @@ VectorXd jointToAbsolutePosition(const VectorXd &alpha, const _input_ &input)
     q.segment(0, 3) << alpha(0), 0.0, 0.0;      // box: (x0, y0, fi0)
     q.segment(3, 3) << alpha(0), 0.0, alpha(1); // first link: (x1=x0, y1, fi1)
 
+// to do: parallelize
     for (int i = 2; i < input.Nbodies; i++)
     {
         const int prev = i - 1;
@@ -73,6 +74,7 @@ VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, 
 
     alphaAbsolute.segment(0, 2) << 0.0, alpha(1);
 
+// to do: parallelize
     for (int i = 2; i < input.Nbodies; i++)
     {
         const int prev = i - 1;
@@ -92,6 +94,7 @@ VectorXd absolutePositionToAbsoluteAlpha(const VectorXd& q)
     // const int qSize = q.size();
     // VectorXd absoluteAlpha = VectorXd::Zero(q.size() / 3);
     // absoluteAlpha = q(seqN())
+// to do: parallelize
     const int qSize = q.size();
     VectorXd absoluteAlpha = VectorXd::Zero(qSize / 3);
     for(int i = 2; i < qSize; i += 3)
@@ -154,7 +157,7 @@ VectorXd joint2AbsAngles(const VectorXd &alpha)
     alphaAbs(0) = alpha(0);
     alphaAbs(1) = alpha(1);
 
-    // zrownoleglic tutaj?
+// to do: parallelize, note: cumulative sum 
     for (int i = 2; i < alphaAbs.size(); i++)
     {
         alphaAbs(i) = alphaAbs(i - 1) + alpha(i);
@@ -252,7 +255,7 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
     dataJoint sf1 = solutionFwd.getDynamicValues(baseInd+1, input);
     dataJoint sf2 = solutionFwd.getDynamicValues(baseInd+2, input);
 
-// to do: zrownoleglic
+// to do: parallelize
     for (int i = 0; i < Nvars; i++) {
         Matrix4d nodeVals;
         nodeVals << pow(sr1.t, 3), pow(sr1.t, 2), sr1.t, 1.0,
