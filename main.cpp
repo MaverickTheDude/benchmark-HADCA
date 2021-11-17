@@ -22,18 +22,23 @@ using std::endl;
 static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data);
 
 int main(int argc, char* argv[]) {
+    int Nbodies = 4, Nthreads = 4;
+    if (argc > 1) {
+        Nthreads = atoi(argv[1]);
+        Nbodies  = atoi(argv[2]);
+    }
 # ifdef _OPENMP
-#pragma omp parallel
-{
-    if (omp_get_thread_num() == 0)
-        cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads." << endl;
-} //end pragma omp
+    omp_set_num_threads(Nthreads);
+// #pragma omp parallel
+// {
+//     if (omp_get_thread_num() == 0)
+//         cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads with " << Nbodies << " bodies." << endl;
+// }
 # else
     cout << "Caution: Your sourcecode was compiled without switching OpenMP on" << endl;
-# endif
+# endif 
 
     /* SETTINGS */
-    const int Nbodies = 4;
     double inputSignal = 2.0;
     double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0001;
     double lb = -HUGE_VAL, ub = HUGE_VAL;
@@ -42,12 +47,12 @@ int main(int argc, char* argv[]) {
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
     _solution_ solutionFwd = RK_solver(u_zero, *input);
-    solutionFwd.show_xStatus(u_zero, *input);
+    // solutionFwd.show_xStatus(u_zero, *input);
     input->w_hq   = w_hq;
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-#if true // check adjoint equations or initial setup
+#if false // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
 	{
 		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
@@ -101,7 +106,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     delete input;
-	cout << "done\n";
+	// cout << "done\n";
 	return 0;
 }
 

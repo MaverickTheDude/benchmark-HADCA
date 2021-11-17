@@ -18,7 +18,12 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     VectorXd alpha  = y.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
     VectorXd dalpha(n), dpjoint(n);
-    const double u = interpolateControl(t, uVec, input);
+    double u;
+    if (input.Nsamples < 4)
+        u = 0;     // we simulate only how fast RHS gets evaluated, so we don't need that
+    else
+        u = interpolateControl(t, uVec, input);
+    
 
     using aaA = aligned_allocator<Assembly>;
     vector<vector<Assembly, aaA >, aaA > tree;

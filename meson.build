@@ -35,6 +35,9 @@ executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2,
 e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : openmp)
 test('unitTest', e)
 
+# timings:
+executable('timing', 'timing.cpp', dependencies : libgomp)
+
 # Jacobi matrices building performance test
 #executable('jacobiBuildPerf', 'misc/jacobiBuildPerf.cpp', sources: sourcelist)
 
