@@ -5,6 +5,9 @@
 #include "../include/solution.h"
 #include <omp.h>
     #include <iostream>
+    #include <iomanip>
+    #include <time.h>
+    #include <stdlib.h>
 using std::vector;
 
 VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& u, const _input_& input) {
@@ -24,6 +27,8 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     else
         u = interpolateControl(t, uVec, input);
     
+    double wt1, wt, ct;
+	clock_t start;
 
     using aaA = aligned_allocator<Assembly>;
     vector<vector<Assembly, aaA >, aaA > tree;
@@ -35,6 +40,8 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
     // https://stackoverflow.com/a/18671256/4283100
     size_t *prefix;
+    start = clock();
+    wt1 = omp_get_wtime();
 #pragma omp parallel
 {
     int ithread = 0, nthreads = 1;
@@ -63,14 +70,22 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     std::copy(vec_private.begin(), vec_private.end(), dest_iter );
 }
     delete[] prefix;
+    clock_t end = clock();
+    ct = double(end - start) / double(CLOCKS_PER_SEC);
+    wt = omp_get_wtime() - wt1; // ta wartosc jest prawie w ogole niewrazliwa na zmiane liczby watkow ...
+    if (!solution.dummySolution())
+        std::cout << "first copy: clock time:\t" << std::setprecision(6) << ct << " wall time:\t" << std::setprecision(6) << wt << "\n";
 
-
+    start = clock();
+    wt1 = omp_get_wtime();
     for (int i = 1; i < input.Ntiers; i++) {
         vector<Assembly, aaA >& branch = tree[i];
         vector<Assembly, aaA >& upperBranch = tree[i-1];
         branch.resize(input.tiersInfo[i]);
         const int endOfBranch = input.tiersInfo[i-1] - 1;
 
+    start = clock();
+    wt1 = omp_get_wtime();
 #pragma omp parallel
 {
         int ithread = 0, nthreads = 1;
@@ -103,6 +118,10 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     if (input.tiersInfo[i-1] % 2 == 1)
         branch.back() = upperBranch.back(); // note: shallow copy is exactly what we need
     }
+    ct = double(clock() - start) / double(CLOCKS_PER_SEC);
+    wt = omp_get_wtime() - wt1;
+    if (!solution.dummySolution())
+        std::cout << "first copy: clock time:\t" << std::setprecision(6) << ct << " wall time:\t" << std::setprecision(6) << wt << "\n";
     
     /* base body connection */
     Assembly& AssemblyS = tree[input.Ntiers-1][0];
@@ -177,11 +196,18 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
 
 
     /* acceleration analysis */
+    start = clock();
+    wt1 = omp_get_wtime();
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < input.Nbodies; i++)
         leafBodies[i].setKsiAcc(i, alphaAbs, dAlphaAbs, P1art, input);
         
+    ct = double(clock() - start) / double(CLOCKS_PER_SEC);
+    wt = omp_get_wtime() - wt1;
+    std::cout << "first no-copy: clock time: " << std::setprecision(6) << ct << " wall time: " << wt << "\n";
 
+    start = clock();
+    wt1 = omp_get_wtime();
     for (int i = 1; i < input.Ntiers; i++) {
         vector<Assembly, aaA >& branch = tree[i];
         vector<Assembly, aaA >& upperBranch = tree[i-1];
@@ -197,7 +223,10 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
         if (Nparents % 2 == 1)
 			branch.back().assembleAcc(upperBranch.back());
     }
-
+    ct = double(clock() - start) / double(CLOCKS_PER_SEC);
+    wt = omp_get_wtime() - wt1;
+    std::cout << "main no-copy: clock time: " << std::setprecision(6) << ct << " wall time: " << wt << "\n";
+    std::cout << "\n\n" << std::endl;
 
     /* base body connection */
     AssemblyS.connect_base_bodyAcc();

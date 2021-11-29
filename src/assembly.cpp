@@ -132,6 +132,20 @@ void Assembly::setKsiAcc(const int id, const VectorXd& alphaAbs, const VectorXd&
 
 	ksiAcc_10 =  M1_inv * (Q1 - dSc1 * P1 - dM1 * calculate_V1());
 	ksiAcc_20 =  M2_inv * (Q2 - dSc2 * P1 - dM2 * calculate_V2());
+
+// Added to give this function more work (comparison of time execution)
+	// Matrix3d S12tmp = SAB("s12", id, alphaAbs, input);
+    // const Matrix3d S21 = SAB("s21", id, alphaAbs, input);
+    // const Matrix3d S1C = SAB("s1C", id, alphaAbs, input);
+    // const Matrix3d S2C = SAB("s2C", id, alphaAbs, input);
+    // const Matrix3d Mc = massMatrix(id, input);
+    // const Matrix3d M1 = S1C * Mc * S1C.transpose();
+    // const Matrix3d M2 = S2C * Mc * S2C.transpose();
+    // Matrix3d i11 = M1.inverse();
+    // Matrix3d i22 = M2.inverse();
+    // Matrix3d i12 = M1.ldlt().solve(S12);
+    // Matrix3d i21 = M2.ldlt().solve(S21);
+	// Q1_init(id, alphaAbs, 0, input);
 }
 
 void Assembly::assembleAcc(const Assembly& AsmA, const Assembly& AsmB) {
@@ -143,6 +157,11 @@ void Assembly::assembleAcc(const Assembly& AsmA, const Assembly& AsmB) {
 
     ksiAcc_10 =  AsmA.ksiAcc_10 - AsmA.ksi.k12() * beta;
     ksiAcc_20 =  AsmB.ksiAcc_20 + AsmB.ksi.k21() * beta;
+
+// Added to give this function more work (comparison of time execution)
+	// ksi_coefs ksi1(ksi_coefs(AsmA.ksi, AsmB.ksi));
+    // Vector3d Stmp = AsmA.Q1Acc + AsmA.S12 * AsmB.Q1Acc;
+    // Matrix3d Stmp2 = AsmA.S12 * AsmB.S12;
 }
 
 void Assembly::assembleAcc(const Assembly& AsmA) {
