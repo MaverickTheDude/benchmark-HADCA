@@ -38,6 +38,9 @@ test('unitTest', e)
 # timings:
 executable('timing', 'timing.cpp', dependencies : libgomp)
 
+# utilsTest (time of execution)
+executable('utilsTest', 'misc/utilsTests.cpp', sources : sourcelist, dependencies : libgomp)
+
 # Jacobi matrices building performance test
 #executable('jacobiBuildPerf', 'misc/jacobiBuildPerf.cpp', sources: sourcelist)
 

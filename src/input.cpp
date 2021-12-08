@@ -6,7 +6,7 @@ using namespace Eigen;
 
 #include <iostream>
 
-#define SIMULATION_TIME 0.01
+#define SIMULATION_TIME 1
 #define TIME_STEP 0.01
 #define LOG_ENERGY false
 
