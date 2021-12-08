@@ -33,7 +33,7 @@ Assembly::Assembly() :
     S12(Matrix3d()) ,
     ptrAsmA(nullptr), ptrAsmB(nullptr)  { }
 	
-/* copy constructor needed to call std::copy(vectors in a tree). The default is 'delete' */
+/* copy assignment needed to call std::copy(vectors in a tree). The default is 'delete' */
 Assembly& Assembly::operator=(const Assembly& A) {
 	ksi = A.ksi;
 	Q1Acc = A.Q1Acc;
@@ -170,6 +170,19 @@ void Assembly::setAcc(const Assembly& Asm) {
 }
 
 /* ADJOINT ASSEMBLY */
+/* copy assignment needed to call std::copy(vectors in a tree). The default is 'delete' */
+AssemblyAdj& AssemblyAdj::operator=(const AssemblyAdj& A) {
+	ksi = A.ksi;
+	ptrAsmA = A.ptrAsmA;
+	ptrAsmB = A.ptrAsmB;
+	return *this;
+}
+
+/* default constructor needed to call vector<AssemblyAdj>.resize() */
+AssemblyAdj::AssemblyAdj() : 
+	ksi(ksi_coefs()) ,
+    ptrAsmA(nullptr), ptrAsmB(nullptr)  { }
+
 AssemblyAdj::AssemblyAdj(const int id, const dataAbsolute& data, const double& u, const _input_& input) : 
 	ksi(ksi_coefs(id, data, u, input)) ,
     ptrAsmA(nullptr), ptrAsmB(nullptr)  { }

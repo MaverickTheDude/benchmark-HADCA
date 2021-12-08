@@ -84,6 +84,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
         prefix[0] = 0;
 }
         vector<Assembly, aaA > vec_private;
+        vec_private.reserve(input.tiersInfo[i] / nthreads);
 #pragma omp for schedule(static) nowait
         for(int j = 0; j < endOfBranch; j += 2) {
             vec_private.emplace_back(upperBranch[j], upperBranch[j+1]);

@@ -29,11 +29,11 @@ int main(int argc, char* argv[]) {
     }
 # ifdef _OPENMP
     omp_set_num_threads(Nthreads);
-// #pragma omp parallel
-// {
-//     if (omp_get_thread_num() == 0)
-//         cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads with " << Nbodies << " bodies." << endl;
-// }
+#pragma omp parallel
+{
+    if (omp_get_thread_num() == 0)
+        cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads with " << Nbodies << " bodies." << endl;
+}
 # else
     cout << "Caution: Your sourcecode was compiled without switching OpenMP on" << endl;
 # endif 
@@ -52,14 +52,14 @@ int main(int argc, char* argv[]) {
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-#if false // check adjoint equations or initial setup
+#if true // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
 	{
 		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();
 	}
-	_solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
-	solutionG.print();
+	// _solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
+	// solutionG.print();
 #endif
 
 #if false // optimize

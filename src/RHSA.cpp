@@ -24,33 +24,86 @@ VectorXd RHS_ADJOINT(const double& tau, const VectorXd& y, const VectorXd& uVec,
     VectorXd de(n);
     const double u = interpolateControl(t, uVec, input);
 
-    vector<vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >, aligned_allocator<AssemblyAdj> > tree;
+    using aaA = aligned_allocator<AssemblyAdj>;
+    vector<vector<AssemblyAdj, aaA >, aaA > tree;
     tree.resize(input.Ntiers);
-    vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >& leafBodies = tree[0];
-    leafBodies.reserve(input.tiersInfo[0]);
+    vector<AssemblyAdj, aaA >& leafBodies = tree[0];
+    leafBodies.resize(input.tiersInfo[0]);
 
-// TODO: parallelize
     /* Initialize leaf bodies (baza indukcyjna) */
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
-    for (int i = 0; i < input.Nbodies; i++)
-        leafBodies.emplace_back(i, stateAbs, u, input);
-    
+	size_t *prefix;
+#pragma omp parallel
+{
+    int ithread = 0, nthreads = 1;
+# ifdef _OPENMP
+    ithread  = omp_get_thread_num();
+    nthreads = omp_get_num_threads();
+# endif
+#pragma omp single
+    {
+        prefix = new size_t[nthreads+1];
+        prefix[0] = 0;
+    }
+    vector<AssemblyAdj, aaA > vec_private;
+    vec_private.reserve(input.Nbodies / nthreads);
+#pragma omp for schedule(static) nowait
+    for (int i = 0; i < input.Nbodies; i++) {
+        vec_private.emplace_back(i, stateAbs, u, input);
+    }
+    prefix[ithread+1] = vec_private.size();
+#pragma omp barrier
+#pragma omp single
+{
+    for(int i=1; i<(nthreads+1); i++) prefix[i] += prefix[i-1];
+} // implicit barrier
+    auto dest_iter = std::next(leafBodies.begin(), prefix[ithread]);
+    std::copy(vec_private.begin(), vec_private.end(), dest_iter );
+}
+    delete[] prefix;
 
     for (int i = 1; i < input.Ntiers; i++) {
-        vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >& branch = tree[i];
-        vector<AssemblyAdj, aligned_allocator<AssemblyAdj> >& upperBranch = tree[i-1];
-        branch.reserve(input.tiersInfo[i]);
+        vector<AssemblyAdj, aaA >& branch = tree[i];
+        vector<AssemblyAdj, aaA >& upperBranch = tree[i-1];
+        branch.resize(input.tiersInfo[i]);
         const int endOfBranch = input.tiersInfo[i-1] - 1;
 
-// TODO: parallelize
         /* core loop of DCA algorithm */
+        // for (int j = 0; j < endOfBranch; j+=2) {
+        //     branch.emplace_back(upperBranch[j], upperBranch[j+1]);
+        // }
+#pragma omp parallel
+{
+        int ithread = 0, nthreads = 1;
+    # ifdef _OPENMP
+        ithread  = omp_get_thread_num();
+        nthreads = omp_get_num_threads();
+    # endif
+    #pragma omp single
+    {
+        prefix = new size_t[nthreads+1];
+        prefix[0] = 0;
+    }
+        vector<AssemblyAdj, aaA > vec_private;
+        vec_private.reserve(input.tiersInfo[i] / nthreads);
+    #pragma omp for schedule(static) nowait
         for (int j = 0; j < endOfBranch; j+=2) {
-            branch.emplace_back(upperBranch[j], upperBranch[j+1]);
+            vec_private.emplace_back(upperBranch[j], upperBranch[j+1]);
         }
+        prefix[ithread+1] = vec_private.size();
+    #pragma omp barrier
+    #pragma omp single
+    {
+        for(int i=1; i<(nthreads+1); i++) prefix[i] += prefix[i-1];
+    } // implicit barrier
+        auto dest_iter = std::next(branch.begin(), prefix[ithread]);
+        std::copy(vec_private.begin(), vec_private.end(), dest_iter );
+}
+        delete[] prefix;
         
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1)
-			branch.emplace_back(upperBranch.back()); // fixme: konstruktor kopiujacy ?
+            branch.back() = upperBranch.back(); // note: shallow copy is exactly what we need
     }
     
     /* base body connection */
@@ -63,7 +116,7 @@ VectorXd RHS_ADJOINT(const double& tau, const VectorXd& y, const VectorXd& uVec,
 		const int end_of_branch = input.tiersInfo[i-1] % 2 == 0 ?
 				input.tiersInfo[i] : input.tiersInfo[i]-1;
 
-// TODO: parallelize
+#pragma omp parallel for schedule(static)
 		for (int j = 0; j < end_of_branch; j++) {
 			tree[i].at(j).disassemble();
 		}
@@ -81,7 +134,7 @@ VectorXd RHS_ADJOINT(const double& tau, const VectorXd& y, const VectorXd& uVec,
     VectorXd deta(3*n);
     deta.segment(0, 3) = leafBodies[0].calculate_dETA1();
 
-// TODO: parallelize
+#pragma omp parallel for schedule(static)
 	for (int i = 1; i < input.Nbodies; i++) {
         const Vector3d H = input.pickBodyType(i).H;
 		Vector3d dE1B = leafBodies[i].calculate_dETA1();
@@ -99,17 +152,18 @@ VectorXd RHS_ADJOINT(const double& tau, const VectorXd& y, const VectorXd& uVec,
 
     const int ind = atTime(t, solutionFwd.T, input).first;
 
-    task::Phi Phi(input);
-    Vector3d norms;
-
-    norms(0) = (Phi.q(stateAbs.q) * stateAbs.ksi).norm();
-    norms(1) = (Phi.q(stateAbs.q) * stateAbs.eta + Phi.ddtq(stateAbs.q, stateAbs.dq) * stateAbs.ksi).norm();
-    norms(2) = ( Phi.q(stateAbs.q) * deta - 2 * Phi.ddtq(stateAbs.q, stateAbs.dq) * stateAbs.eta  -
-                Phi.d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * stateAbs.ksi ).norm();
-
     solution.set_c(ind, c);
     solution.set_e(ind, e);
-    solution.setNorms(ind, norms);
+
+    if (input.logConstr) {
+        task::Phi Phi(input);
+        Vector3d norms;
+        norms(0) = (Phi.q(stateAbs.q) * stateAbs.ksi).norm();
+        norms(1) = (Phi.q(stateAbs.q) * stateAbs.eta + Phi.ddtq(stateAbs.q, stateAbs.dq) * stateAbs.ksi).norm();
+        norms(2) = ( Phi.q(stateAbs.q) * deta - 2 * Phi.ddtq(stateAbs.q, stateAbs.dq) * stateAbs.eta  -
+                    Phi.d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * stateAbs.ksi ).norm();
+        solution.setNorms(ind, norms);
+    }
 
     return dy;
 }

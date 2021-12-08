@@ -9,13 +9,14 @@ using namespace Eigen;
 #define SIMULATION_TIME 1
 #define TIME_STEP 0.01
 #define LOG_ENERGY false
+#define LOG_CONSTR true
 
 _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
                                   dalpha0(Nbodies),   pjoint0(Nbodies),
                                   sigma0(2 * Nbodies),
                                   Tk(SIMULATION_TIME), dt(TIME_STEP), Nsamples(Tk/dt+1),
                                   Ntiers(ceil(log2(Nbodies))+1),
-                                  logEnergy(LOG_ENERGY)
+                                  logEnergy(LOG_ENERGY), logConstr(LOG_CONSTR)
 {
     bodyTypes.emplace_back("box");
     bodyTypes.emplace_back("link");

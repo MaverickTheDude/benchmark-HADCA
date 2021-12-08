@@ -10,6 +10,8 @@ class AssemblyAdj {
     friend VectorXd RHS_ADJOINT(const double& t, const VectorXd& y, const _input_& input);
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    AssemblyAdj& operator=(const AssemblyAdj& A);
+    AssemblyAdj();
     AssemblyAdj(const int id, const dataAbsolute& data, const double& u, const _input_& input);
     AssemblyAdj(AssemblyAdj& AsmA, AssemblyAdj& AsmB);
     void connect_base_body();

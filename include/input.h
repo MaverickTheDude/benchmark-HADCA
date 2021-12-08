@@ -36,7 +36,7 @@ public:
     const double Tk, dt;
     const int Nsamples, Ntiers;
     int* tiersInfo;
-    const bool logEnergy;
+    const bool logEnergy, logConstr;
     double w_hq  = 1.0;
     double w_hdq = 0.0;
     double w_hsig= 0.0;
