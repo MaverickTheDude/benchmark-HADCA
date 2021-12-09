@@ -27,13 +27,15 @@ friend void PhiTimeDerivatives::constraints::setStartConditions(_input_ &input);
     body pickBodyType(int bodyId) const {
         return (bodyId == 0) ? bodyTypes[0] : bodyTypes[1];
     }
+    void setTk(double tk);
 
 public:
     const int Nbodies;
     const int Nconstr = 2*Nbodies;
     VectorXd alpha0, dalpha0, pjoint0, sigma0;
     std::vector<body, aligned_allocator<body> > bodyTypes;
-    const double Tk, dt;
+    double Tk;
+    const double dt;
     const int Nsamples, Ntiers;
     int* tiersInfo;
     const bool logEnergy, logConstr;

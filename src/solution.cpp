@@ -119,8 +119,8 @@ void _solutionAdj_::printHDCA() const {
 	const int n = e.rows();
 	MatrixXd sol(2*n+1 + 3, N);
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = e;
-	sol.block(1+n, 0, n, N) = c;
+	sol.block(1, 0, n, N) = c; // zmieniamy kolejnosc, zeby latwiej bylo znalezc w pliku .txt gradient
+	sol.block(1+n, 0, n, N) = e;
 	sol.block(1+2*n, 0, 3, N) = norms;
 	outFile << sol;
 	outFile.close();

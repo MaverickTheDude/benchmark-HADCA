@@ -3,6 +3,7 @@
 #include "../Eigen/Dense"
 #include "../include/constants.h"
 #include "../include/task/M.h"
+#include "omp.h"
 
 #include <iostream>
 #include <fstream>
@@ -10,6 +11,256 @@
 #include <math.h>
 
 using namespace Eigen;
+
+#define PARALLEL_UTILS false
+
+#if PARALLEL_UTILS
+
+VectorXd joint2AbsAngles(const VectorXd &alpha)
+{
+    const int Nbodies = alpha.size();
+    VectorXd alphaAbs(alpha.size());
+    alphaAbs(0) = alpha(0);
+    alphaAbs(1) = alpha(1);
+    double sum  = 0.0;
+    
+	//--- phi term calculation (cummulative sum) -------
+    int Nthr;
+#pragma omp parallel
+    {
+        if (omp_get_thread_num() == 0)
+            Nthr = omp_get_num_threads();
+    }
+	VectorXd sumThr = VectorXd::Zero(Nthr + 1);
+
+    // Compute cumsum for each thread
+    int chunk = (Nbodies - 1 + Nthr - 1) / Nthr;
+#pragma omp parallel for schedule(static, chunk) firstprivate(sum)
+	for (int i = 1; i < Nbodies; i++) {
+		sum += alpha(i);
+		alphaAbs(i) = sum;
+		sumThr(omp_get_thread_num() + 1) = sum;
+	}
+
+    // Compute offsets for consecutive threads (phi)
+	for (int i=1; i < Nthr; i++)
+		sumThr(i) += sumThr(i - 1);
+
+	// Apply offsets and compute cumsums for (r)
+#pragma omp parallel for schedule(static, chunk)
+	for (int i = 1; i < Nbodies; i++)
+        alphaAbs(i) += sumThr(omp_get_thread_num());
+
+    return alphaAbs;
+}
+
+VectorXd jointToAbsolutePosition(const VectorXd &alpha, const _input_ &input)
+{
+    /**
+     * Converts joint coordinates alpha to absolute coordinates q (3 * number_of_bodies).
+     */
+    const int Nbodies = input.Nbodies;
+
+    VectorXd q(3 * Nbodies);
+    q.segment(0, 3) << alpha(0), 0.0, 0.0;      // box: (x0, y0, fi0)
+    q.segment(3, 3) << alpha(0), 0.0, alpha(1); // first link: (x1=x0, y1, fi1)
+
+	VectorXd phi   = VectorXd::Zero(Nbodies);
+    MatrixXd r_mat = MatrixXd::Zero(2, Nbodies + 1);
+
+    double sum      = 0.0;
+    Vector2d r_sum  = Vector2d::Zero();
+    Vector2d r_bias = q.head(2);
+
+	//--- phi term calculation (cummulative sum) -------
+    int Nthr;
+#pragma omp parallel
+    {
+        if (omp_get_thread_num() == 0)
+            Nthr = omp_get_num_threads();
+    }
+	VectorXd sumThr_phi = VectorXd::Zero(Nthr + 1);
+	MatrixXd sumThr_r   = MatrixXd::Zero(2, Nthr + 1);
+
+    // Compute cumsum for each thread (phi)
+    // Save the results in sumThr_phi(thread_id + 1)
+    int chunk = (Nbodies - 1 + Nthr - 1) / Nthr;
+#pragma omp parallel for schedule(static, chunk) firstprivate(sum)
+	for (int i = 1; i < Nbodies; i++) {
+		sum += alpha(i);
+		phi(i) = sum;
+		sumThr_phi(omp_get_thread_num() + 1) = sum;
+	}
+
+	// Compute offsets for consecutive threads (phi)
+	for (int i=1; i < Nthr; i++)
+		sumThr_phi(i) += sumThr_phi(i - 1);
+
+	// Apply offsets and compute cumsums for (r)
+#pragma omp parallel for schedule(static, chunk) firstprivate(r_sum)
+	for (int i = 1; i < Nbodies; i++) {
+        phi(i) += sumThr_phi(omp_get_thread_num());
+        r_sum += Rot(phi(i)) * input.pickBodyType(i).s12;       
+        r_mat.col(i + 1) = r_sum;
+        sumThr_r.col(omp_get_thread_num() + 1) = r_sum;
+	}
+
+	// Compute offsets for consecutive threads (r)
+	for (int i=1; i < Nthr; i++)
+		sumThr_r.col(i) += sumThr_r.col(i - 1);
+
+	// Apply offsets (r) and build q vactor
+#pragma omp parallel for schedule(static, chunk)
+	for (int i = 1; i < Nbodies - 1; i++) {
+        const int next = i + 1;
+        r_mat.col(next) += sumThr_r.col(omp_get_thread_num());
+        q.segment(3*next, 2) = r_mat.col(next) + r_bias;
+        q(3*next+2) = phi(next);
+    }
+
+    return q;
+}
+
+VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, const _input_ &input)
+{
+    /**
+     * Converts joint velocity dalpha to absolute velocity dq (3 * number_of_bodies).
+     */
+
+    const int Nbodies = input.Nbodies;
+
+    VectorXd dq(3 * input.Nbodies);
+    dq.segment(0, 3) << dalpha(0), 0.0, 0.0;
+    dq.segment(3, 3) << dalpha(0), 0.0, dalpha(1);
+
+    VectorXd phi = VectorXd::Zero(Nbodies);
+    VectorXd phi_prim = VectorXd::Zero(Nbodies);
+    MatrixXd r_prim = MatrixXd::Zero(2, Nbodies + 1);
+
+    double phi_sum = 0, phi_prim_sum = 0;
+    Vector2d r_prim_sum = Vector2d::Zero();
+    Vector2d r_prim_bias = dq.head(2);
+
+    int Nthr;
+#pragma omp parallel
+    {
+        if(omp_get_thread_num() == 0)
+            Nthr = omp_get_num_threads();
+    }
+    VectorXd sumThr_phi = VectorXd::Zero(Nthr + 1);
+    VectorXd sumThr_phi_prim = VectorXd::Zero(Nthr + 1);
+    MatrixXd sumThr_r_prim = MatrixXd::Zero(2, Nthr + 1);
+
+    // Compute cumsum for each thread (phi, phi_prim)
+    // Save the results in sumThr_phi and sumThr_phi_prmi (indexed thread_id + 1)
+    int chunk = (Nbodies - 1 + Nthr - 1) / Nthr;
+#pragma omp parallel for schedule(static, chunk) firstprivate(phi_sum, phi_prim_sum)
+	for (int i = 1; i < Nbodies; i++) {
+        phi_sum += alpha(i);
+        phi_prim_sum += dalpha(i);
+        phi(i) = phi_sum;
+        phi_prim(i) = phi_prim_sum;
+        sumThr_phi(omp_get_thread_num() + 1) = phi_sum;
+        sumThr_phi_prim(omp_get_thread_num() + 1) = phi_prim_sum;
+    }
+
+    // Compute offsets for consecutive thread (phi, phi_prim)
+    for (int i=1; i < Nthr; i++)
+    {
+		sumThr_phi(i) += sumThr_phi(i - 1);
+        sumThr_phi_prim(i) += sumThr_phi_prim(i - 1);
+    }
+
+    //Apply offsets and compute cumsums for (r_prim)
+#pragma omp parallel for schedule(static, chunk) firstprivate(r_prim_sum)
+	for (int i = 1; i < Nbodies; i++) {
+        phi(i) += sumThr_phi(omp_get_thread_num());
+        phi_prim(i) += sumThr_phi_prim(omp_get_thread_num());
+        r_prim_sum += Om * Rot(phi(i)) * phi_prim(i) * input.pickBodyType(i).s12;
+        r_prim.col(i + 1) = r_prim_sum;
+        sumThr_r_prim.col(omp_get_thread_num() + 1) = r_prim_sum;
+    }
+
+    // Compute offsets for consecutive threads (r_prim)
+    for (int i=1; i < Nthr; i++)
+		sumThr_r_prim.col(i) += sumThr_r_prim.col(i - 1);
+
+    // Apply offsets (r) and build q vactor
+#pragma omp parallel for schedule(static, chunk)
+	for (int i = 1; i < Nbodies - 1; i++) {
+        const int next = i + 1;
+        r_prim.col(next) += sumThr_r_prim.col(omp_get_thread_num());
+        dq.segment(3 * next, 2) = r_prim.col(next) + r_prim_bias;
+        dq(3 * next + 2) = phi_prim(next);
+    }
+
+    return dq;
+}
+
+#else
+
+VectorXd joint2AbsAngles(const VectorXd &alpha)
+{
+    VectorXd alphaAbs(alpha.size());
+    alphaAbs(0) = alpha(0);
+    alphaAbs(1) = alpha(1);
+
+    for (int i = 2; i < alphaAbs.size(); i++)
+    {
+        alphaAbs(i) = alphaAbs(i - 1) + alpha(i);
+    }
+    return alphaAbs;
+}
+
+VectorXd jointToAbsolutePosition(const VectorXd &alpha, const _input_ &input)
+{
+    /**
+     * Converts joint coordinates alpha to absolute coordinates q (3 * number_of_bodies).
+     */
+    VectorXd q(3 * input.Nbodies);
+
+    q.segment(0, 3) << alpha(0), 0.0, 0.0;      // box: (x0, y0, fi0)
+    q.segment(3, 3) << alpha(0), 0.0, alpha(1); // first link: (x1=x0, y1, fi1)
+
+    for (int i = 2; i < input.Nbodies; i++)
+    {
+        const int prev = i - 1;
+        q.segment(3 * i, 2) = q.segment(3 * prev, 2) +
+                              Rot(q(3 * prev + 2)) * input.pickBodyType(prev).s12;
+        q(3 * i + 2) = q(3 * prev + 2) + alpha(i);
+    }
+
+    return q;
+}
+
+VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, const _input_ &input)
+{
+    /**
+     * Converts joint velocity dalpha to absolute velocity dq (3 * number_of_bodies).
+     */
+    VectorXd dq(3 * input.Nbodies);
+    VectorXd alphaAbsolute(input.Nbodies);
+
+    dq.segment(0, 3) << dalpha(0), 0.0, 0.0;
+    dq.segment(3, 3) << dalpha(0), 0.0, dalpha(1);
+
+    alphaAbsolute.segment(0, 2) << 0.0, alpha(1);
+
+    for (int i = 2; i < input.Nbodies; i++)
+    {
+        const int prev = i - 1;
+        dq.segment(3 * i, 2) = dq.segment(3 * prev, 2) +
+                    Om*Rot(alphaAbsolute(prev)) * dq(3 * prev + 2) * input.pickBodyType(prev).s12;
+        dq(3 * i + 2) = dq(3 * prev + 2) + dalpha(i);
+
+        alphaAbsolute(i) = alphaAbsolute(prev) + alpha(i);
+    }
+
+    return dq;
+}
+
+
+#endif
 
 Matrix2d Rot(double fi)
 {
@@ -37,55 +288,6 @@ MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd &, const _input_ &), Vector
     }
 
     return Fun_q;
-}
-
-VectorXd jointToAbsolutePosition(const VectorXd &alpha, const _input_ &input)
-{
-    /**
-     * Converts joint coordinates alpha to absolute coordinates q (3 * number_of_bodies).
-     */
-    VectorXd q(3 * input.Nbodies);
-
-    q.segment(0, 3) << alpha(0), 0.0, 0.0;      // box: (x0, y0, fi0)
-    q.segment(3, 3) << alpha(0), 0.0, alpha(1); // first link: (x1=x0, y1, fi1)
-
-// to do: parallelize
-    for (int i = 2; i < input.Nbodies; i++)
-    {
-        const int prev = i - 1;
-        q.segment(3 * i, 2) = q.segment(3 * prev, 2) +
-                              Rot(q(3 * prev + 2)) * input.pickBodyType(prev).s12;
-        q(3 * i + 2) = q(3 * prev + 2) + alpha(i);
-    }
-
-    return q;
-}
-
-VectorXd jointToAbsoluteVelocity(const VectorXd &alpha, const VectorXd &dalpha, const _input_ &input)
-{
-    /**
-     * Converts joint velocity dalpha to absolute velocity dq (3 * number_of_bodies).
-     */
-    VectorXd dq(3 * input.Nbodies);
-    VectorXd alphaAbsolute(input.Nbodies);
-
-    dq.segment(0, 3) << dalpha(0), 0.0, 0.0;
-    dq.segment(3, 3) << dalpha(0), 0.0, dalpha(1);
-
-    alphaAbsolute.segment(0, 2) << 0.0, alpha(1);
-
-// to do: parallelize
-    for (int i = 2; i < input.Nbodies; i++)
-    {
-        const int prev = i - 1;
-        dq.segment(3 * i, 2) = dq.segment(3 * prev, 2) +
-                    Om*Rot(alphaAbsolute(prev)) * dq(3 * prev + 2) * input.pickBodyType(prev).s12;
-        dq(3 * i + 2) = dq(3 * prev + 2) + dalpha(i);
-
-        alphaAbsolute(i) = alphaAbsolute(prev) + alpha(i);
-    }
-
-    return dq;
 }
 
 VectorXd absolutePositionToAbsoluteAlpha(const VectorXd& q)
@@ -149,20 +351,6 @@ Matrix3d dSABdAlpha(const Vector2d& translation, const double absoluteAlpha)
     Matrix3d S = Matrix3d::Zero();
     S.block(2, 0, 1, 2) = (- Rot(absoluteAlpha) * translation).transpose();
     return S;
-}
-
-VectorXd joint2AbsAngles(const VectorXd &alpha)
-{
-    VectorXd alphaAbs(alpha.size());
-    alphaAbs(0) = alpha(0);
-    alphaAbs(1) = alpha(1);
-
-// to do: parallelize, note: cumulative sum 
-    for (int i = 2; i < alphaAbs.size(); i++)
-    {
-        alphaAbs(i) = alphaAbs(i - 1) + alpha(i);
-    }
-    return alphaAbs;
 }
 
 Matrix3d massMatrix(const int id, const _input_& input)
@@ -255,7 +443,7 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
     dataJoint sf1 = solutionFwd.getDynamicValues(baseInd+1, input);
     dataJoint sf2 = solutionFwd.getDynamicValues(baseInd+2, input);
 
-// to do: parallelize
+#pragma omp parallel for schedule(static)
     for (int i = 0; i < Nvars; i++) {
         Matrix4d nodeVals;
         nodeVals << pow(sr1.t, 3), pow(sr1.t, 2), sr1.t, 1.0,

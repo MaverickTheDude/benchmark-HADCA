@@ -47,12 +47,13 @@ int main(int argc, char* argv[]) {
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
     _solution_ solutionFwd = RK_solver(u_zero, *input);
-    // solutionFwd.show_xStatus(u_zero, *input);
+solutionFwd.show_xStatus(u_zero, *input);
     input->w_hq   = w_hq;
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-#if true // check adjoint equations or initial setup
+#define OPT false
+#if !OPT // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
 	{
 		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
@@ -62,7 +63,7 @@ int main(int argc, char* argv[]) {
 	// solutionG.print();
 #endif
 
-#if false // optimize
+#if OPT // optimize
     nlopt::opt opt(nlopt::LD_MMA, input->Nsamples); // LD_SLSQP  LD_MMA  LD_CCSAQ  AUGLAG  G_MLSL_LDS (useless: GN_DIRECT_L, GN_ISRES)
     opt.set_xtol_rel(1e-4);
     opt.set_maxeval(100);

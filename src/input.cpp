@@ -34,6 +34,8 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
 	}
 }
 
+void _input_::setTk(double tk) { Tk = tk; }
+
 void  _input_::setPJointAndSigma(void)
 {
     /**
