@@ -1,10 +1,12 @@
 #pragma once
 
 #include "../Eigen/Dense"
-#include "input.h"
+#include "../include/assembly.h"
+#include "../include/input.h"
 #include "../include/solution.h"
 
 using namespace Eigen;
+using aaA = aligned_allocator<Assembly>;
 
 // utils.cpp
 Matrix2d Rot(double fi);
@@ -21,13 +23,13 @@ Matrix3d dSABdAlpha(const Vector2d& translation, const double absoluteAlpha);
 VectorXd joint2AbsAngles(const VectorXd& alpha);
 Matrix3d massMatrix(const int id, const _input_& input);
 Vector3d Q1_init(int id, const VectorXd& alphaAbs, const double& u, const _input_& input);
-double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& input);
-void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input);
+void logTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, const VectorXd& uVec, const _input_& input);
 dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _input_& input);
 dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input);
 std::pair<int, const bool> atTime(const double& t, const VectorXd& T, const _input_& input);
 double interpolateControl(const double& t, const VectorXd& uVec, const _input_& input);
 double trapz(const VectorXd& x, const _input_& input);
+void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj, const VectorXd& uVec, const _input_& input);
 
 // solvers.cpp
 _solution_ RK_solver(const _input_& input);

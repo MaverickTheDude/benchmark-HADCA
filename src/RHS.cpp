@@ -228,7 +228,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
 		const Vector3d dV1B = leafBodies[i].calculate_dV1();
 		const Vector3d dV2A = leafBodies[i-1].calculate_dV2();
 		d2alpha(i) = H.transpose() * (dV1B - dV2A);
-        lambda.segment(2*i, 2) = D.transpose() * leafBodies[0].L1;
+        lambda.segment(2*i, 2) = D.transpose() * leafBodies[i].L1;
 	}
     
     solution.setD2alpha(index, d2alpha);

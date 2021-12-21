@@ -68,13 +68,16 @@ _solution_ RK_solver(const VectorXd& uVec, const _input_& input) {
 		VectorXd k3 = RHS_HDCA(t + dt/2.0, y_m1 + dt/2.0 * k2, uVec, input);
 		VectorXd k4 = RHS_HDCA(t + dt,     y_m1 + dt     * k3, uVec, input);
 
+        if (input.logEnergy)
+            logTotalEnergy(t, y_m1, k1, uVec, input); // at t-1: (t, y, dy, ...)
+			
 		VectorXd y = y_m1 +  dt/6 * (k1 + 2*k2 + 2*k3 + k4);
 		y_m1 = y;
 
-        if (input.logEnergy)
-            logTotalEnergy(t, y, input);
 	}
-    RHS_HDCA(input.Tk, y_m1, uVec, input, solution); // save last entry
+    VectorXd dy = RHS_HDCA(input.Tk, y_m1, uVec, input, solution); // save last entry
+	if (input.logEnergy)
+		logTotalEnergy(input.Tk, y_m1, dy, uVec, input); // at t-1: (t, y, dy, ...)
 //	t =  omp_get_wtime() - t; //toc
 //	std::cout << "calkowity czas: " << t << std::endl << std::endl;
 

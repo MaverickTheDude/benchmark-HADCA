@@ -72,6 +72,7 @@ public:
     dataJoint getDynamicValues(const int index, const _input_& input) const;
 
     void setT(VectorXd _T_) {T = _T_;}
+    void setT(std::vector<double> _T_) {T = Eigen::Map<Eigen::VectorXd>( &_T_[0], _T_.size() );}
     void setAlpha(  int ind, VectorXd _alpha_)   { alpha.col(ind)   = _alpha_  ; }
     void setDalpha( int ind, VectorXd _dalpha_)  { dalpha.col(ind)  = _dalpha_ ; }
     void setD2alpha(int ind, VectorXd _d2alpha_) { d2alpha.col(ind) = _d2alpha_; }

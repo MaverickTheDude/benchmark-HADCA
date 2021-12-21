@@ -14,7 +14,8 @@ sourcelist = ['src/assembly.cpp',
     'src/task/M.cpp',
     'src/adjoint.cpp',
     'src/solvers.cpp',
-    'src/RHSA.cpp']
+    'src/RHSA.cpp',
+    'src/RHS-odeint.cpp']
 
 # Add openmp support. Note: tdhis can be done with a single dependency, but we keep verbose version to show more syntax
 # https://mesonbuild.com/Adding-arguments.html
@@ -27,16 +28,18 @@ dep1 = cc.find_library('m')
 dep2 = cc.find_library('nlopt', dirs : '/usr/local/lib/')
 libgomp = cc.find_library('gomp')
 openmp = dependency('openmp')
+# export BOOST_ROOT=/usr/local/boost_1_77_0/ (or if you know how to simply add God damn folders to -I ...)
+boost_dep = dependency('boost')
 
-executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp],
+executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp, boost_dep],
             cpp_args : '-fopenmp')#, link_args : '-fopenmp' )
 
 # tests:
-e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : openmp)
-test('unitTest', e)
+#e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : openmp)
+#test('unitTest', e)
 
 # timings:
-executable('timing', 'timing.cpp', dependencies : libgomp)
+#executable('timing', 'timing.cpp', dependencies : libgomp)
 
 # utilsTest (time of execution)
 # executable('utilsTest', 'misc/utilsTests.cpp', sources : sourcelist, dependencies : libgomp)

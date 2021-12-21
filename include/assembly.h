@@ -1,7 +1,7 @@
 #pragma once
 
-#include "input.h"
-#include "ksiCoefs.h"
+#include "../include/input.h"
+#include "../include/ksiCoefs.h"
 #include "../Eigen/Dense"
 
 using namespace Eigen;
@@ -27,6 +27,8 @@ private:
 };
 
 class Assembly {
+    friend void test_SetAssembly(void);
+    friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_&, _solution_&);
     friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const _input_& input);
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -51,8 +53,14 @@ public:
     Vector3d calculate_dV1() const;
     Vector3d calculate_dV2() const;
 
-friend VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, const _input_&, _solution_&);
-friend void test_SetAssembly(void);
+    /* getters for RHS-odeint */
+    const Vector3d T1_() const { return T1; }
+    const Vector3d T2_() const { return T2; }
+    const Vector3d L1_() const { return L1; }
+    const Vector3d L2_() const { return L2; }
+    const Vector3d Q1Art_() const { return Q1Art; }
+    const Vector3d Q2Art_() const { return Q2Art; }
+
 private:
     /* const correctness fails when we want to use std::copy inside std::vector */
     /*const*/ ksi_coefs ksi;

@@ -6,9 +6,9 @@ using namespace Eigen;
 
 #include <iostream>
 
-#define SIMULATION_TIME 1
+#define SIMULATION_TIME 5
 #define TIME_STEP 0.01
-#define LOG_ENERGY false
+#define LOG_ENERGY true
 #define LOG_CONSTR true
 
 _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),

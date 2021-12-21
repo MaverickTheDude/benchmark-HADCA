@@ -367,11 +367,9 @@ Vector3d Q1_init(int id, const VectorXd &alphaAbs, const double& u, const _input
     return Q_out;
 }
 
-double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
+static double calculateTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, 
+                                   const VectorXd& uVec, const _input_& input) {
     const unsigned int n = input.alpha0.size();
-	VectorXd U_ZERO(input.Nsamples); // quick hack: now we assume no input signal when calculating energy
-	U_ZERO.setZero();
-    VectorXd dy = RHS_HDCA(t , y, U_ZERO, input);
     VectorXd alpha  = y.tail(n);
     VectorXd dalpha = dy.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
@@ -390,11 +388,14 @@ double calculateTotalEnergy(const double& t, const VectorXd& y, const _input_& i
         energy += 0.5 * V.transpose() * M * V + 
                   m * M_GRAV * qi(1);
     }
+    double u = interpolateControl(t, uVec, input);
+    double x1 = y(input.Nbodies);
+    energy -= u * x1;
 
     return energy;
 }
 
-void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
+void logTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, const VectorXd& uVec, const _input_& input) {
     /*  
      * Funkcjia loguje calkowita energie w ukladzie i sluzy do testowania obliczen.
      * */
@@ -407,7 +408,7 @@ void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
         cleanFile = false;
     }
     
-    double energy = calculateTotalEnergy(t, y, input);
+    double energy = calculateTotalEnergy(t, y, dy, uVec, input);
 
 	std::ofstream outFile;
 	outFile.open("../output/energy.txt", std::ios_base::app);
@@ -422,7 +423,8 @@ void logTotalEnergy(const double& t, const VectorXd& y, const _input_& input) {
 }
 
 dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _input_& input) {
-    assert(t >= 0.0 && t <= input.Tk);
+    const double eps = 1e-10;
+    assert(t >= 0.0 && t <= input.Tk + eps);
 
     /* return values at node index */
     std::pair<int,bool> indStruct = solutionFwd.atTime(t, input);
@@ -436,8 +438,16 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
 
     if (baseInd == 0)
         baseInd++;
-    else if (baseInd == input.Nsamples-2) // pre-last node
+    else if (baseInd == input.Nsamples-2)   // pre-last node
         baseInd--;
+    else if (baseInd == input.Nsamples-1) { // last node
+        const int last = Nvars-1;
+        dataInterp.alpha   = solutionFwd.alpha.col(last);
+        dataInterp.dalpha  = solutionFwd.dalpha.col(last);
+        dataInterp.d2alpha = solutionFwd.d2alpha.col(last);
+        dataInterp.lambda  = solutionFwd.lambda.col(last);
+        return dataInterp;
+    }
     dataJoint sr1 = solutionFwd.getDynamicValues(baseInd-1, input);
     dataJoint s00 = solutionFwd.getDynamicValues(baseInd  , input);
     dataJoint sf1 = solutionFwd.getDynamicValues(baseInd+1, input);
@@ -477,7 +487,8 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
 }
 
 dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input) {
-    assert(t >= 0.0 && t <= input.Tk);
+    const double eps = 1e-10;
+    assert(t >= 0.0 && t <= input.Tk + eps);
 
     /* return values at node index */
     std::pair<int,bool> indStruct = solutionFwd.atTime(t, input);
@@ -500,11 +511,15 @@ dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, cons
     return dataInterp;
 }
 
+static int compare_min(const int i, const int j, const VectorXd& T, const double& t) {
+    return abs(T[i] - t) < abs(T[j]-t) ? i : j;
+}
 std::pair<int, const bool> atTime(const double& t, const VectorXd& T, const _input_& input) {
 	/* 
 	* overload metody klasy _solution_ (to do: uogolnic do statycznej metody)
 	*/
-    assert(t >= 0.0 && t <= input.Tk);
+    const double eps = 1e-10;
+    assert(t >= 0.0 && t <= input.Tk + eps);
 	const double& dt = input.dt;
     int begin = 0;
     int end = input.Nsamples-1;
@@ -517,16 +532,21 @@ std::pair<int, const bool> atTime(const double& t, const VectorXd& T, const _inp
 		else				end   = mid;
 	}
 
-	for (int i = begin; i <= end; i++) {
-		if ( abs(T(i) 	   - t) < 1e-10 ) return std::make_pair(i, _solution_::NODE_VALUE);
-		if ( abs(T(i)+dt/2 - t) < 1e-10 ) return std::make_pair(i, _solution_::INTERMEDIATE_VALUE);
-	}
+    int min_ind = begin;
+	for (int i = begin+1; i <= end; i++)
+        min_ind = compare_min(min_ind, i, T, t);
 
-	throw std::runtime_error("atTime: index not found");
+    if (abs(T(min_ind) - t) > dt)
+	    throw std::runtime_error("atTime: index not found");
+    else if ( abs(T(min_ind) 	 - t) < 1e-10 ) 
+        return std::make_pair(min_ind, _solution_::NODE_VALUE);
+    else
+        return std::make_pair(min_ind, _solution_::INTERMEDIATE_VALUE);
 }
 
 double interpolateControl(const double& t, const VectorXd& uVec, const _input_& input) {
-    assert(t >= 0.0 && t <= input.Tk);
+    const double eps = 1e-10;
+    assert(t >= 0.0 && t <= input.Tk + eps);
      /* return values at node index */
     VectorXd T = VectorXd::LinSpaced(input.Nsamples, 0, input.Tk);
     std::pair<int,bool> indStruct = atTime(t, T, input);
@@ -540,6 +560,9 @@ double interpolateControl(const double& t, const VectorXd& uVec, const _input_& 
         baseInd++;
     else if (baseInd == input.Nsamples-2) // pre-last node
         baseInd--;
+    else if (baseInd == input.Nsamples-1) // last node
+        return uVec.tail(1).value();
+
     double tr1 = T(baseInd-1);      double ur1 = uVec(baseInd-1);
     double t00 = T(baseInd  );      double u00 = uVec(baseInd  );
     double tf1 = T(baseInd+1);      double uf1 = uVec(baseInd+1);
@@ -567,4 +590,29 @@ double trapz(const VectorXd& x, const _input_& input) {
     double out = dt * x.segment(1, N-2).sum();
     out += (x(0)+x(N-1))*dt/2;
     return out;
+}
+
+void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj, 
+					 const VectorXd& uVec, const _input_& input) {
+	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
+	std::ofstream outFile;
+	outFile.open("../output/checkGrad.txt");
+
+	if (outFile.fail() )
+		throw std::runtime_error("print_checkGrad(...): nie udalo sie otworzyc pliku.");
+
+	double gama = input.w_hsig;
+	const int N = solAdj.e.cols();
+	const int n = solAdj.e.rows();
+
+	MatrixXd sol(5, N);
+	sol.row(0) = solFwd.T;
+	sol.row(1) = solAdj.c.row(0);									// c_adj
+	for (int i = 0; i < input.Nsamples; i++)						// 
+		sol(2,i) = ( 2*gama*uVec(i) - solAdj.c(0,i) ) * input.dt;	// gradient
+	sol.row(3) = solFwd.alpha.row(0);								// x
+	sol.row(4) = solFwd.dalpha.row(0);								// dx
+
+	outFile << sol;
+	outFile.close();
 }

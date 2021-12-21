@@ -5,12 +5,17 @@
 const bool _solution_::INTERMEDIATE_VALUE = false;
 const bool _solution_::NODE_VALUE = true;
 
+static int compare_min(const int i, const int j, const VectorXd& T, const double& t) {
+    return abs(T[i] - t) < abs(T[j]-t) ? i : j;
+}
 std::pair<int, const bool> _solution_::atTime(const double& t, const _input_& input) const {
 	/* 
 	* Znajduje indeks wartosci t w wektorze T metoda bisekcji. 
 	* Ostatnie kilka krokow odbywa sie liniowo, zeby nie bawic sie corner case'y
 	* Zwraca pare <indeks, NodeValue>
 	*/
+	const double eps = 1e-10;
+    assert(t >= 0.0 && t <= input.Tk + eps);
 	const double& dt = input.dt;
     int begin = 0;
     int end = T.size()-1;
@@ -23,12 +28,16 @@ std::pair<int, const bool> _solution_::atTime(const double& t, const _input_& in
 		else				end   = mid;
 	}
 
-	for (int i = begin; i <= end; i++) {
-		if ( abs(T(i) 	   - t) < 1e-10 ) return std::make_pair(i, _solution_::NODE_VALUE);
-		if ( abs(T(i)+dt/2 - t) < 1e-10 ) return std::make_pair(i, _solution_::INTERMEDIATE_VALUE);
-	}
+	int  min_ind = begin;
+	for (int i = begin+1; i <= end; i++)
+        min_ind = compare_min(min_ind, i, T, t);
 
-	throw std::runtime_error("_solution_/atTime: index not found");
+    if (abs(T(min_ind) - t) > dt)
+	    throw std::runtime_error("atTime: index not found");
+    else if ( abs(T(min_ind) 	 - t) < 1e-10 ) 
+        return std::make_pair(min_ind, _solution_::NODE_VALUE);
+    else
+        return std::make_pair(min_ind, _solution_::INTERMEDIATE_VALUE);
 }
 
 dataJoint _solution_::getDynamicValues(const int index, const _input_& input) const {
@@ -70,10 +79,12 @@ void _solution_::print() const {
 	const int N = alpha.cols();
 	const int n = alpha.rows();
 	MatrixXd sol(2*n+1, N);
+	// MatrixXd sol(3*n+1, N);
 
 	sol.row(0) = T;
 	sol.block(1, 0, n, N) = dalpha;
 	sol.block(1+n, 0, n, N) = alpha;
+	// sol.block(1+n, 0, 2*n, N) = lambda;
 
 	outFile << sol;
 	outFile.close();
@@ -83,10 +94,10 @@ void _solution_::print(const VectorXd& u) const {
 
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
 	std::ofstream outFile;
-	outFile.open("../output/results.txt");
+	outFile.open("../output/resultsForward.txt");
 
 	if (outFile.fail() )
-		throw std::runtime_error("nie udalo sie otworzyc pliku.");
+		throw std::runtime_error("_solution_::print(const VectorXd&): nie udalo sie otworzyc pliku.");
 
 	const int N = alpha.cols();
 	const int n = alpha.rows();
@@ -96,6 +107,23 @@ void _solution_::print(const VectorXd& u) const {
 	sol.block(1, 0, n, N) = dalpha;
 	sol.block(1+n, 0, n, N) = alpha;
 	sol.row(2*n+1) = u;
+
+	outFile << sol;
+	outFile.close();
+
+	outFile.open("../output/checkOpt.txt");
+	if (outFile.fail() )
+		throw std::runtime_error("_solution_::print(const VectorXd&): nie udalo sie otworzyc pliku (2).");
+
+	MatrixXd solCheck(8, N);
+	solCheck.row(0) = T;
+	solCheck.row(1) = u;
+	solCheck.row(2) = alpha.row(0);    // x
+	solCheck.row(3) = alpha.row(1);    // phi1
+	solCheck.row(4) = alpha.row(n-1);  // phi_n
+	solCheck.row(5) = dalpha.row(0);   // dx
+	solCheck.row(6) = dalpha.row(1);   // dphi1
+	solCheck.row(7) = dalpha.row(n-1); // dphi_n
 
 	outFile << sol;
 	outFile.close();
@@ -113,7 +141,7 @@ void _solutionAdj_::printHDCA() const {
 	outFile.open("../output/resultsAdjoint.txt");
 
 	if (outFile.fail() )
-		throw std::runtime_error("nie udalo sie otworzyc pliku.");
+		throw std::runtime_error("_solutionAdj_::printHDCA(): nie udalo sie otworzyc pliku.");
 
 	const int N = e.cols();
 	const int n = e.rows();
@@ -133,7 +161,7 @@ void _solutionAdj_::printGlobal() const {
 	outFile.open("../output/resultsAdjointGlobal.txt");
 
 	if (outFile.fail() )
-		throw std::runtime_error("nie udalo sie otworzyc pliku.");
+		throw std::runtime_error("_solutionAdj_::printGlobal: nie udalo sie otworzyc pliku.");
 
 	const int N = eta.cols();
 	const int n = eta.rows();

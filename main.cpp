@@ -2,6 +2,7 @@
 #include "include/utils.h"
 #include "include/adjoint.h"
 #include "include/task/Phi.h"
+#include "include/odeint.h"
 #include "Eigen/Dense"
 #include <iostream>
 #include <time.h>
@@ -11,6 +12,13 @@
 #include <Eigen/StdVector> // zamiast <vector> (to chyba to samo z dodatkowym paddingiem dla pamieci?)
 #include <omp.h>
 // export OMP_NUM_THREADS=4
+
+/* TODO: 0) przetestowac checkOpt i checkGrad w Matlabie / Excelu.
+         1) sensownie rozwiazac zadanie dla size = 4, 8, 16 (?) -> checkOpt
+         2) obliczyc gradient dla size = 128, 256 (?). Porownac czas dla wersji seq i parallel. 
+            -> checkGrad. note: wyniki GLOBAL vs HDCA 
+         3) Timing dla roznych rozmiarow zadan. Byc moze porownac same oszacowania RHS dla size = 512, 1024, 2048 ...
+            -> timings.cpp */
 
 // .natvis (Eigen visualization on debug): broken
 // https://stackoverflow.com/questions/58624914/using-natvis-file-to-visualise-c-objects-in-vs-code
@@ -46,7 +54,7 @@ int main(int argc, char* argv[]) {
     /* initialize */
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
-    _solution_ solutionFwd = RK_solver(u_zero, *input);
+    _solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
 solutionFwd.show_xStatus(u_zero, *input);
     input->w_hq   = w_hq;
     input->w_hdq  = w_hdq;
@@ -56,8 +64,9 @@ solutionFwd.show_xStatus(u_zero, *input);
 #if !OPT // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
 	{
-		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
+		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();
+        print_checkGrad(solutionFwd, solution, u_zero, *input);
 	}
 	// _solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
 	// solutionG.print();
@@ -92,14 +101,12 @@ solutionFwd.show_xStatus(u_zero, *input);
     try{
         /* nlopt::result result = */ opt.optimize(signal, minf);
         std::cout << "found minimum!\nf = " << std::setprecision(10) << minf << std::endl;
-        for (int i = 0; i < input->Nsamples; i++)
-            u(i) = signal[i];
-        _solution_ solutionFwd = RK_solver(u, *input);
-        solutionFwd.print(u);
 
         /* post processing */
-        _solution_ solutionPP = RK_solver(u, *input);
-        solutionPP.show_xStatus(u, *input);
+        u = VectorXd::Map(signal.data(), input->Nsamples);
+        _solution_ solutionFwd = RK_solver(u, *input);
+        solutionFwd.print(u);
+        solutionFwd.show_xStatus(u, *input);
     }
     catch(std::exception &e) {
         std::cout << "nlopt failed: " << e.what() << std::endl;
