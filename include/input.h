@@ -39,7 +39,7 @@ public:
     const double dt;
     const int Nsamples, Ntiers;
     int* tiersInfo;
-    const bool logEnergy, logConstr;
+    const bool logEnergy, logConstr, calculateSignal;
     double w_hq  = 1.0;
     double w_hdq = 0.0;
     double w_hsig= 0.0;

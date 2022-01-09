@@ -82,8 +82,8 @@ void _solution_::print() const {
 	// MatrixXd sol(3*n+1, N);
 
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = dalpha;
-	sol.block(1+n, 0, n, N) = alpha;
+	sol.block(1, 0, n, N) = d2alpha;
+	sol.block(1+n, 0, n, N) = dalpha;
 	// sol.block(1+n, 0, 2*n, N) = lambda;
 
 	outFile << sol;
@@ -124,6 +124,38 @@ void _solution_::print(const VectorXd& u) const {
 	solCheck.row(5) = dalpha.row(0);   // dx
 	solCheck.row(6) = dalpha.row(1);   // dphi1
 	solCheck.row(7) = dalpha.row(n-1); // dphi_n
+
+	outFile << sol;
+	outFile.close();
+}
+
+const std::vector<double>& _solutionGlobal_::get_signal() const {
+	return signal;
+}
+
+void _solutionGlobal_::setValues(int index, const VectorXd& q, const VectorXd& dq, 
+								 const VectorXd& d2q, const VectorXd& lambda) {
+	cartPosVelAcc.col(index) << q(0), dq(0), d2q(0);
+	const int end = lambda.size() - 1;
+	lambda_x0(index) = lambda(end);
+	signal.push_back(lambda(end));
+}
+
+void _solutionGlobal_::print() const {
+	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
+	std::ofstream outFile;
+	outFile.open("../output/resultsGlobal.txt");
+
+	if (outFile.fail() )
+		throw std::runtime_error("_solutionGlobal_::print(...): nie udalo sie otworzyc pliku.");
+
+	const int N = T.size();
+	MatrixXd sol(5, N);
+
+	sol.row(0) = T;
+	sol.block(1, 0, 3, N) = cartPosVelAcc;
+	if (calculateSignal)
+		sol.row(4) = lambda_x0;
 
 	outFile << sol;
 	outFile.close();
@@ -176,7 +208,7 @@ void _solutionAdj_::printGlobal() const {
 
 dataAbsolute::dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input) :
 							t(data.t), q(3*input.Nbodies), dq(3*input.Nbodies), d2q(3*input.Nbodies), 
-							eta(3*input.Nbodies), ksi(3*input.Nbodies),  lambda(data.lambda) // to do: move() lambda
+							eta(3*input.Nbodies), ksi(3*input.Nbodies),  lambda(data.lambda) // to do: move() lambda -> const ref in .h file
 {
     /**
      * Converts joint alpha, dalpha, and d2alpha to their absolute counterparts [q, dq, d2q].
@@ -217,5 +249,31 @@ dataAbsolute::dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint
 
         eta.segment(3*i, 2) = eta.segment(3*prev, 2) +  (Om*Rot(phi) * etaRot - Rot(phi)*om * ksiRot) * s12;
         eta(3*i + 2) = etaRot + e(i);
+	}
+}
+
+dataAbsolute::dataAbsolute(const VectorXd& alpha, const VectorXd& dalpha, const _input_ &input) :
+							t(0.0), q(3*input.Nbodies), dq(3*input.Nbodies), d2q(0), eta(0), ksi(0), lambda(0)
+{
+    /**
+     * Converts joint alpha, dalpha to their absolute counterparts [q, dq]
+	 * Used for computing initial condition for global forward problem (odeint).
+     */
+    q.segment(0,6)   << alpha(0),   0.0, 0.0,  alpha(0),   0.0,  alpha(1);
+	dq.segment(0,6)  << dalpha(0),  0.0, 0.0,  dalpha(0),  0.0,  dalpha(1);
+
+// zrownoleglamy wszystkie obliczenia na raz
+    for (int i = 2; i < input.Nbodies; i++)
+    {
+        const int prev = i - 1;
+        const double phi = q(3*prev + 2);
+        const double om  = dq(3*prev + 2);
+        const Vector2d& s12 = input.pickBodyType(prev).s12;
+
+        q.segment(3*i, 2) = q.segment(3*prev, 2) +  Rot(phi) * s12;
+        q(3*i + 2) = phi + alpha(i);
+
+        dq.segment(3*i, 2) = dq.segment(3*prev, 2) +  Om*Rot(phi) * s12 * om;
+        dq(3*i + 2) = om + dalpha(i);
 	}
 }

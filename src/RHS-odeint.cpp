@@ -3,6 +3,7 @@
 #include "../include/input.h"
 #include "../include/assembly.h"
 #include "../include/solution.h"
+#include "../include/adjoint.h"
 #include "../include/task/Phi.h"
 #include "../include/odeint.h"
 // #include <boost/numeric/odeint.hpp>
@@ -12,12 +13,11 @@
 #include <omp.h>
 #include <iostream>
 using std::vector;
+using namespace boost::numeric;
 
 #define SHOW_PROGRESS true
 
 _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
-    using namespace boost::numeric;
-
 	const double dt = input.dt;
 	const int Nbodies = input.Nbodies;
     _solution_ solution(input);
@@ -59,7 +59,6 @@ _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
 
 _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& solutionFwd, 
                                       const _input_& input, const int& formulation) {
-    using namespace boost::numeric;
     if (formulation == _solutionAdj_::GLOBAL) {
         throw std::runtime_error("RK_AdjointSolver_odeInt: unsuported formulation (GLOBAL)"); }
 	const int Nbodies = input.Nbodies;
@@ -86,6 +85,39 @@ _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& so
 
 	return solution;
 };
+
+
+_solutionGlobal_ RK_GlobalSolver_odeInt(const VectorXd& uVec, const _input_& input) {
+	const double dt = input.dt;
+	const int Nbodies = input.Nbodies;
+    _solutionGlobal_ solution(input);
+
+    std::vector<double> y0(6*Nbodies); 
+    std::vector<double> T(input.Nsamples);
+    std::generate(T.begin(), T.end(), [n = 0, &dt]() mutable { return n++ * dt; });
+
+    dataAbsolute stateAbs(input.alpha0, input.dalpha0, input);
+	task::M Mass(input);
+    VectorXd pAbs0 = Mass(stateAbs.q)* stateAbs.dq;
+
+    auto dest_iter = std::next(y0.begin(), 3*Nbodies);
+    std::copy(pAbs0.data(), pAbs0.data() + 3*Nbodies, y0.begin());
+    std::copy(stateAbs.q.data(),  stateAbs.q.data()  + 3*Nbodies, dest_iter);
+
+    //[ integration_class
+    RHS_GLOBAL_ODE rho(input, uVec);
+
+    // define_adaptive_stepper
+    typedef odeint::runge_kutta_cash_karp54< state_type > error_stepper_type;
+    typedef odeint::controlled_runge_kutta< error_stepper_type > controlled_stepper_type;
+    controlled_stepper_type controlled_stepper;
+    odeint::integrate_times(controlled_stepper , rho , 
+            y0, T.begin() , T.end(), input.dt,
+            odeint_globalObserver(input, rho, solution, uVec) );
+
+	return solution;
+};
+
 
 // ======== ADJOINT ========
 
@@ -577,4 +609,106 @@ void odeint_observer::operator()( const state_type &y , double t )
         ++cnt;
     }
 #endif
+}
+
+// ======== GLOBAL FORWARD ========
+
+static MatrixXd calc_phi_q(const VectorXd& q, const _input_& input) {
+    const int Nbodies = input.Nbodies;
+    const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
+    task::Phi phi(input);
+    MatrixXd phi_q = MatrixXd::Zero(Nconstr, 3*Nbodies);
+
+    if (input.calculateSignal) {
+        phi_q.block(0, 0, Nconstr-1, 3*Nbodies) = phi.q(q);
+        phi_q(Nconstr-1, 0) = 1;
+    }
+    else
+    {
+        phi_q  = phi.q(q);
+    }
+    return phi_q;
+}
+
+static MatrixXd calc_phi_dq(const VectorXd& q, const VectorXd& dq, const _input_& input) {
+    const int Nbodies = input.Nbodies;
+    const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
+    task::Phi phi(input);
+    MatrixXd phi_dq = MatrixXd::Zero(Nconstr, 3*Nbodies);
+
+    if (input.calculateSignal)
+        phi_dq.block(0, 0, Nconstr-1, 3*Nbodies) = phi.ddtq(q, dq);
+    else
+        phi_dq  = phi.ddtq(q, dq);
+    return phi_dq;
+}
+
+void RHS_GLOBAL_ODE::operator() (const state_type &y, state_type &dy , const double t) {
+	const unsigned int n = y.size()/2;
+    const int Nbodies = input.Nbodies;
+    const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
+    const VectorXd pAbs = VectorXd::Map(y.data(),   n);
+    const VectorXd q    = VectorXd::Map(y.data()+n, n);
+    double u_ctrl = interpolateControl(t, uVec, input);
+    
+    task::M Mass(input);
+    const MatrixXd phi_q  = calc_phi_q(q, input);
+    MatrixXd A = MatrixXd::Zero(3*Nbodies + Nconstr, 3*Nbodies + Nconstr);
+	A.block(0, 0, 3*Nbodies, 3*Nbodies) = Mass(q);
+	A.block(0, 3*Nbodies, 3*Nbodies, Nconstr) = phi_q.transpose();
+	A.block(3*Nbodies, 0, Nconstr, 3*Nbodies) = phi_q;
+
+    VectorXd RHS = VectorXd::Zero(3*Nbodies+Nconstr);
+    RHS.head(3*Nbodies) = pAbs;
+	const VectorXd dq_sigma   = A.partialPivLu().solve(RHS);
+    const VectorXd& dq  = dq_sigma.head(3*Nbodies);
+    const VectorXd& sigma = dq_sigma.tail(Nconstr);
+
+    const MatrixXd phi_dq = calc_phi_dq(q, dq, input);
+    const VectorXd T  = 0.5*Mass.ddqdq(q, dq) * dq; // note: ddqdq already transposed
+    const VectorXd Q1 = Q1_global(q, dq, u_ctrl, input);
+    const VectorXd dp = T + Q1 + phi_dq.transpose() * sigma;
+
+    dy.resize(y.size());    // BIG WARNING: niedopilnowanie odpowiedniego rozmiaru dy generuje undef. behaviour wczesniej
+    auto dest_iter = std::next(dy.begin(), n);
+    std::copy(dp.data(), dp.data()+n, dy.begin());
+    std::copy(dq.data(), dq.data()+n, dest_iter);
+}
+
+void odeint_globalObserver::operator()( const state_type &y , double t )
+{
+	const unsigned int n = y.size() / 2;
+    const int Nbodies = input.Nbodies;
+	const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
+	state_type dy;
+    global_obj(y, dy, t);
+    double u_ctrl = interpolateControl(t, uVec, input);
+    VectorXd q  = VectorXd::Map(y.data()+n,  n);
+    VectorXd dq = VectorXd::Map(dy.data()+n, n);
+
+    if (input.logEnergy) {
+        VectorXd y2  = VectorXd::Map(y.data(),  2*n);
+        VectorXd dy2 = VectorXd::Map(dy.data(), 2*n);
+        logTotalEnergy(t, y2, dy2, uVec, input);
+    }
+
+    task::M Mass(input);
+    const MatrixXd phi_q  = calc_phi_q(q, input);
+    const MatrixXd phi_dq = calc_phi_dq(q, dq, input);
+    const VectorXd T  = 0.5 * Mass.ddqdq(q, dq) * dq; // note: ddqdq already transposed
+    const VectorXd Q1 = Q1_global(q, dq, u_ctrl, input);
+
+    MatrixXd A = MatrixXd::Zero(3*Nbodies + Nconstr, 3*Nbodies + Nconstr);
+	A.block(0, 0, 3*Nbodies, 3*Nbodies) = Mass(q);
+	A.block(0, 3*Nbodies, 3*Nbodies, Nconstr) = phi_q.transpose();
+	A.block(3*Nbodies, 0, Nconstr, 3*Nbodies) = phi_q;
+    VectorXd RHS = VectorXd::Zero(3*Nbodies+Nconstr);
+    RHS.head(3*Nbodies) = T + Q1 - Mass.ddt(q, dq) * dq;
+    RHS.tail(Nconstr)   = - phi_dq * dq;
+	VectorXd d2q_lambda = A.partialPivLu().solve(RHS);
+    const VectorXd& d2q = d2q_lambda.head(3*Nbodies);
+    const VectorXd& lambda = d2q_lambda.tail(Nconstr);
+
+    const int index = atTime(t, solution.T, input).first;
+    solution.setValues(index, q, dq, d2q, lambda);
 }

@@ -10,6 +10,7 @@ using namespace Eigen;
 _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input);
 _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& solutionFwd, 
                                       const _input_& input, const int& formulation);
+_solutionGlobal_ RK_GlobalSolver_odeInt(const VectorXd& uVec, const _input_& input) ;
 
 // RHS-odeint.cpp
 typedef std::vector< double > state_type;
@@ -45,6 +46,33 @@ struct odeint_observer
                     const MatrixXd& c_P1art, std::vector<std::vector<Assembly, aaA >, aaA >& c_tree) :
     input(c_input), hdca_obj(c_hdca_obj),  solution(c_solution),  uVec(c_uVec), alphaAbs(c_alphaAbs),
     dAlphaAbs(c_dAlphaAbs), P1art(c_P1art), tree(c_tree) { }
+
+    void operator()(const state_type &y , double t);
+};
+
+// ======= FORWARD GLOBAL =======
+
+class RHS_GLOBAL_ODE {
+    
+    const _input_& input;
+    const VectorXd& uVec;
+
+public:
+    RHS_GLOBAL_ODE(const _input_& c_input, const VectorXd& c_uVec) :
+    input(c_input), uVec(c_uVec) { }
+    void operator() ( const state_type &x , state_type &dxdt , const double t);
+};
+
+struct odeint_globalObserver
+{
+	const _input_& input;
+	RHS_GLOBAL_ODE& global_obj;
+	_solutionGlobal_& solution;
+	const VectorXd& uVec;
+
+    odeint_globalObserver(const _input_& c_input, RHS_GLOBAL_ODE& c_global_obj,  
+                    _solutionGlobal_& c_solution, const VectorXd& c_uVec) :
+    input(c_input), global_obj(c_global_obj),  solution(c_solution),  uVec(c_uVec) { }
 
     void operator()(const state_type &y , double t);
 };

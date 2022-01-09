@@ -1,6 +1,7 @@
 #pragma once
 #include "../Eigen/Dense"
 #include "../include/input.h"
+#include <vector>
 #include <iostream>
 
 using namespace Eigen;
@@ -23,6 +24,7 @@ struct dataJoint {
 
 struct dataAbsolute {
 	dataAbsolute(const VectorXd& e, const VectorXd& c, const dataJoint& data, const _input_ &input);
+    dataAbsolute(const VectorXd& alpha, const VectorXd& dalpha, const _input_ &input);
 	inline double alphaAbs(int id)   const { return q(3*id+2); }
 	inline double dAlphaAbs(int id)  const { return dq(3*id+2); }
 	inline double d2AlphaAbs(int id) const { return d2q(3*id+2); }
@@ -95,6 +97,24 @@ public:
     static const bool NODE_VALUE; // wtf: zmienne statyczne definiujemy w pliku .cpp nawet jesli sa const
     static const bool INTERMEDIATE_VALUE;
     // MatrixXd sigma;  niepotrzebne do adjointa
+};
+
+class _solutionGlobal_ {
+public:
+    _solutionGlobal_(const _input_& input): T(VectorXd::LinSpaced(input.Nsamples, 0, input.Tk)), 
+                                            cartPosVelAcc(3, input.Nsamples), lambda_x0(input.Nsamples),
+                                            calculateSignal(input.calculateSignal)
+                                            { signal.reserve(input.Nsamples); };
+    void setValues(int index, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda);
+    void print() const;
+    const std::vector<double>& get_signal() const;
+    
+    VectorXd T;
+private:
+    MatrixXd cartPosVelAcc;
+    VectorXd lambda_x0;
+    bool calculateSignal;
+    std::vector<double> signal;
 };
 
 class _solutionAdj_ {

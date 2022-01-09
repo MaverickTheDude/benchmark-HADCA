@@ -47,20 +47,25 @@ int main(int argc, char* argv[]) {
 # endif 
 
     /* SETTINGS */
-    double inputSignal = 0.5;
+    double inputSignal = 0.0;
     double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0001;
     double lb = -HUGE_VAL, ub = HUGE_VAL;
 
     /* initialize */
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
+    _solutionGlobal_ solutionFwdG = RK_GlobalSolver_odeInt(u_zero, *input);
+    u_zero = (-1.0) * VectorXd::Map(solutionFwdG.get_signal().data(), input->Nsamples);
+
     _solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
-solutionFwd.show_xStatus(u_zero, *input);
+    solutionFwd.show_xStatus(u_zero, *input);
+
     input->w_hq   = w_hq;
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
     solutionFwd.print(); // dla porownania
+    solutionFwdG.print(); // dla porownania
 #define OPT false
 #if !true // check adjoint equations or initial setup
 	{

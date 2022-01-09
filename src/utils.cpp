@@ -7,7 +7,8 @@
 
 #include <iostream>
 #include <fstream>
-#include <iomanip>
+#include <iterator> // ostream_iterator
+#include <iomanip> // setw, setprecision
 #include <math.h>
 
 using namespace Eigen;
@@ -298,6 +299,7 @@ VectorXd absolutePositionToAbsoluteAlpha(const VectorXd& q)
     // absoluteAlpha = q(seqN())
 // to do: parallelize
     const int qSize = q.size();
+    assert(qSize % 3 == 0);
     VectorXd absoluteAlpha = VectorXd::Zero(qSize / 3);
     for(int i = 2; i < qSize; i += 3)
         absoluteAlpha((i - 2) / 3) = q(i);
@@ -369,6 +371,7 @@ Vector3d Q1_init(int id, const VectorXd &alphaAbs, const double& u, const _input
     return Q_out;
 }
 
+
 Vector3d Q1_init(int id, const VectorXd &alphaAbs, const VectorXd &dAlphaJoint, const double& u, const _input_ &input)
 {
     Vector3d Q_out = Vector3d::Zero();
@@ -377,20 +380,103 @@ Vector3d Q1_init(int id, const VectorXd &alphaAbs, const VectorXd &dAlphaJoint, 
     Q_out = SAB("s1C", id, alphaAbs, input) * Q_out;
     const double c_cart = input.pickBodyFriction(0);
     const double c_pend = input.pickBodyFriction(1);
-    const double& dx = dAlphaJoint(0);
     if (id == 0) {
+        const double& dx = dAlphaJoint(0);
+        const double& dphi_j = dAlphaJoint(1);
         Q_out(0) = u - c_cart * dx;    /* control + friction force */
+        Q_out(2) += c_pend * dphi_j;   /* friction torque */
+    }
+    else if (id == input.Nbodies-1) { // ==> last body
+        const double& dphi_i = dAlphaJoint(id);
+        Q_out(2) += - c_pend * dphi_i;   /* friction torque */
     }
     else {
-        /* note: Q_out uwzglednia tylko tlumienie *swojego* zlacza, ale juz nie sasiada
-         * prawdopodobnie przez zlaczowy opis wspolrzednych. Blad: Q_out(2) += c_pend * (-dphi_i + dphi_j) */
         const double& dphi_i = dAlphaJoint(id);
-        Q_out(2) += -c_pend * dphi_i;   /* friction torque */
+        const double& dphi_j = dAlphaJoint(id+1);
+        Q_out(2) += c_pend * (-dphi_i + dphi_j);   /* friction torque (from both bodies) */
     }
     return Q_out;
 }
 
-static double calculateTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, 
+
+VectorXd Q1_global(const VectorXd &q, const VectorXd &dq, const double& u, const _input_ &input)
+{
+    VectorXd Q_out(3*input.Nbodies);
+    const double c_cart = input.pickBodyFriction(0);
+    const double c_pend = input.pickBodyFriction(1);
+    const double m_pend = input.pickBodyType(1).m;
+    const double& dx = dq(0);
+    
+    Q_out(1) = - M_GRAV * input.pickBodyType(0).m;
+    Q_out(0) = u - c_cart * dx;
+    Q_out(2) = c_pend * (dq(1)-dq(0));
+    
+    for (int i = 1; i < input.Nbodies-1; ++i) {
+        /* gravity */
+        const int phi_i = 3*i+2;
+        const int phi_p = 3*i-1;
+        const int phi_n = 3*i+5;
+        Vector3d Qgrav = {0, - M_GRAV * m_pend, 0};
+        Q_out.segment(3*i, 3) = SAB("s1C", i, q(phi_i), input) * Qgrav;
+        /* damping */
+        Q_out(phi_i) += c_pend * (dq(phi_p) -2*dq(phi_i) + dq(phi_n));
+    }
+    /* last body */
+    int i = input.Nbodies-1;
+    const int phi_i = 3*i+2;
+    const int phi_p = 3*i-1;
+    Vector3d Qgrav = {0, - M_GRAV * m_pend, 0};
+    Q_out.segment(3*i, 3) = SAB("s1C", i, q(phi_i), input) * Qgrav;
+    Q_out(phi_i) += - c_pend * (dq(phi_i) - dq(phi_p));
+
+    return Q_out;
+}
+
+
+static double calculateTotalEnergyGlobal(const double& t, const VectorXd& y, const VectorXd& dy,
+                                   const VectorXd& uVec, const _input_& input) {
+    const unsigned int n = y.size() / 2;
+    VectorXd q  = y.tail(n);
+    VectorXd dq = dy.tail(n);
+    double c_cart = input.pickBodyFriction(0);
+    double c_pend = input.pickBodyFriction(1);
+    static MatrixXd powerDamp = MatrixXd::Zero(n, input.Nsamples);
+    int ind = atTime(t, VectorXd::LinSpaced(input.Nsamples, 0, input.Tk), input).first;
+    
+    double energy = 0.0;
+    powerDamp(0, ind) = - c_cart * dq(0) * dq(0);
+    energy -= trapz(ind, powerDamp.row(0), input);
+
+    for (int i = 0; i < input.Nbodies; ++i) {
+        const int phi_i = 3*i+2;
+        double m      = input.pickBodyType(i).m;
+        Matrix3d M = massMatrix(i, input);
+        Matrix3d S1c = SAB("s1C", i, q(phi_i), input);
+        Vector3d V  = dq.segment(3 * i, 3);
+        Vector2d qi = q.segment(3*i, 2) + Rot(q(phi_i)) * input.pickBodyType(i).s1C;
+        M = S1c * M * S1c.transpose(); // note: aliasing nie zachodzi
+
+        energy += 0.5 * V.transpose() * M * V + 
+                m * M_GRAV * qi(1);
+
+        if (i == 0) continue; // cart calculated separately
+        const double  omega_p = dq(3*i-1);
+        const double& omega_i = dq(phi_i);
+        const double  omega_n = (i == input.Nbodies-1) ? 0.0 : dq(3*i+5);
+        const double  factor  = (i == input.Nbodies-1) ? 1.0 : 2.0;
+        powerDamp(i, ind) = - c_pend * (-omega_p + factor*omega_i - omega_n) * omega_i;
+        energy -= trapz(ind, powerDamp.row(i), input);
+    }
+
+    /* control signal */
+    double x  = q(0);
+    double u = interpolateControl(t, uVec, input);
+    energy -= u * x;
+    
+    return energy;
+}
+
+static double calculateTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy,
                                    const VectorXd& uVec, const _input_& input) {
     const unsigned int n = input.alpha0.size();
     VectorXd alpha  = y.tail(n);
@@ -417,7 +503,10 @@ static double calculateTotalEnergy(const double& t, const VectorXd& y, const Vec
                   m * M_GRAV * qi(1);
 
         /* damping */
-        powerDamp(i, ind) = - c_fric * dalpha(i) * omega(i);
+        const bool first_or_last_body = (i == 0) || (i == input.Nbodies-1);
+        double dalpha_j = (first_or_last_body) ? 0.0 : dalpha(i+1);
+        powerDamp(i, ind) = c_fric * (-dalpha(i) + dalpha_j) * omega(i);
+        
         energy -= trapz(ind, powerDamp.row(i), input);
     }
     /* control signal */
@@ -433,22 +522,41 @@ void logTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, cons
      * Funkcjia loguje calkowita energie w ukladzie i sluzy do testowania obliczen.
      * */
     static bool cleanFile = true;
-    if (cleanFile) {
-        std::ofstream outFile;
-        outFile.open("../output/energy.txt");
-        outFile << "";
-        outFile.close();
-        cleanFile = false;
-    }
+    static bool cleanFileGlobal = true;
     
-    double energy = calculateTotalEnergy(t, y, dy, uVec, input);
+    std::string textFile;
+    double (*calculateEnergyFunction) (const double&, const VectorXd&, const VectorXd&, const VectorXd&, const _input_&);
+    if (dy.size() == 2*input.Nbodies) {
+        textFile = "../output/energy.txt";
+        calculateEnergyFunction = &calculateTotalEnergy;
+        if (cleanFile) {
+            std::ofstream outFile;
+            outFile.open("../output/energy.txt");
+            outFile << "";
+            outFile.close();
+            cleanFile = false;
+        }
+    }
+    else {
+        textFile = "../output/energyGlobal.txt";
+        calculateEnergyFunction = &calculateTotalEnergyGlobal;
+        if (cleanFileGlobal) {
+            std::ofstream outFile;
+            outFile.open("../output/energyGlobal.txt");
+            outFile << "";
+            outFile.close();
+            cleanFileGlobal = false;
+        }
+    }
+
+    double energy = calculateEnergyFunction(t, y, dy, uVec, input);
 
 	std::ofstream outFile;
-	outFile.open("../output/energy.txt", std::ios_base::app);
+	outFile.open(textFile, std::ios_base::app);
 
 	if (outFile.fail() ) {
 		std::cerr << "nie udalo sie otworzyc pliku.";
-        throw std::runtime_error("logTotalEnergy: nie udalo sie otworzyc pliku");
+        throw std::runtime_error("logTotalEnergy: nie udalo sie otworzyc pliku: " + textFile);
 	}
 	outFile << std::setw(4)         << t      << std::setfill('0') << "\t" 
             << std::setprecision(5) << energy << std::endl;
@@ -661,4 +769,28 @@ void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj,
 
 	outFile << sol;
 	outFile.close();
+}
+
+/* https://stackoverflow.com/a/46663311/4283100 */
+void write_vector_to_file(const std::vector<double>& myVector, std::string filename)
+{
+    std::ofstream ofs(filename, std::ios::out | std::ofstream::binary);
+    std::ostream_iterator<char> osi{ ofs };
+    const char* beginByte = (char*)&myVector[0];
+
+    const char* endByte = (char*)&myVector.back() + sizeof(double);
+    std::copy(beginByte, endByte, osi);
+}
+
+std::vector<double> read_vector_from_file(std::string filename)
+{
+    std::vector<char> buffer{};
+    std::ifstream ifs(filename, std::ios::in | std::ifstream::binary);
+    std::istreambuf_iterator<char> iter(ifs);
+    std::istreambuf_iterator<char> end{};
+    std::copy(iter, end, std::back_inserter(buffer));
+    std::vector<double> newVector(buffer.size() / sizeof(double)); // (#elements)
+    memcpy(&newVector[0], &buffer[0], buffer.size()); // ( , , #bytes to copy)
+
+    return newVector;
 }

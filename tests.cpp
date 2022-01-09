@@ -217,35 +217,6 @@ void test_SetAssembly(void) {
 }
 
 
-void test_solveHDCA(void) {
-/*
- * Test na podstawie zachowania energii w ukladzie. Dla dluzszych czasow symulacji konieczne jest obnizenie tolerancji.
- * Prawdopodobnie w pewnej chwili ruchu zachodzi "dziwny" rodzaj ruchu (np. jerk jednego z czlonow) i psuje zachowanie energii
- * Pass dla: Tk = 2 sek, Nbodies = 4 i Rtol = 6e-4
- */
-    int Nbodies = 9;
-    _input_ input = _input_(Nbodies);
-    _solution_ sol = RK_solver(input);
-
-	VectorXd y1(2*Nbodies);
-    VectorXd y2(2*Nbodies);
-    y1.head(Nbodies) = sol.pjoint.col(0);
-    y1.tail(Nbodies) = sol.alpha.col(0);
-
-    y2.head(Nbodies) = sol.pjoint.col(input.Nsamples-1);
-    y2.tail(Nbodies) = sol.alpha.col(input.Nsamples-1);
-
-
-    double e1 = calculateTotalEnergy(0,        y1, input);
-    double e2 = calculateTotalEnergy(input.Tk, y2, input);
-
-    double Rtol = 1e-4; // note; constants.h: changed _L_ from 1.0 to 0.25 and test failed. Switched Rtol from 1e-5
-    double diff = abs(e1-e2);
-    TEST_CHECK_(diff <= e1*Rtol, "\ndiff = %f = %f %% \ntol = %f = %f %% (Rtol) \ne1 =  %f \ne2 =  %f \nNbodies = %d", 
-                diff, diff/e1*100, e1*Rtol, Rtol*100, e1, e2, Nbodies);
-}
-
-
 #include "include/task/F.h"
 
 namespace F_1_q
@@ -464,8 +435,8 @@ void test_interpolate(void) {
             b  = s2.d2alpha(i);
             sign = (b > a) ? 1 : -1;
 
-            const bool specialCase_d2a_ekstremum = abs(t-0.98)<1e-5 && i == 4;
-        if ( !specialCase_d2a_ekstremum )
+        //     const bool specialCase_d2a_ekstremum = abs(t-0.98)<1e-5 && i == 4;
+        // if ( !specialCase_d2a_ekstremum )
             TEST_CHECK_(sign*(c - a) > 0, "d2alpha(%d) at t=%f : (c-a) > 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
                                                   i,        t,                    a,      c,      cL,           b);
             TEST_CHECK_(sign*(c - b) < 0, "d2alpha(%d) at t=%f : (c-b) < 0 fail \n%f (a)\n%f (c)\n%f (c linear)\n%f (b)",
@@ -750,7 +721,6 @@ TEST_LIST = {
    { "joint2AbsVelocity", test_jointToAbsoluteVelocity },
    { "_input_.setPJointAndSigma", test_SetPJoint },
    { "setAssembly", test_SetAssembly },
-   { "solveHDCA", test_solveHDCA},
    { "F_1_q", F_1_q::test},
    { "F_1_dq", F_1_dq::test},
    { "M_ddqdq", M_ddqdq::test},

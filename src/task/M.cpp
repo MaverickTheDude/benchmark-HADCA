@@ -31,7 +31,7 @@ MatrixXd M::operator()(const VectorXd& q) const
 
     for(int i = 0; i < input.Nbodies; i++)
     {
-        const MatrixXd S1C = SAB("s1C", i, absoluteAlpha, input);
+        const Matrix3d S1C = SAB("s1C", i, absoluteAlpha, input);
         m.block(3 * i, 3 * i, 3, 3) = S1C * local(i) * S1C.transpose();
     }
 

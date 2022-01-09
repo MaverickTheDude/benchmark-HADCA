@@ -15,6 +15,9 @@ class Adjoint
 friend VectorXd boundaryConditions(const _solution_& solutionFwd, const _input_& input, int formulation);
 friend VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd& uVec,
                      const _solution_& solutionFwd, const _input_& input, _solutionAdj_& solution);
+friend _solutionGlobal_ RK_GlobalSolver_odeInt(const VectorXd& uVec, const _input_& input);
+friend class RHS_GLOBAL_ODE;
+friend class odeint_globalObserver;
 public:
     Adjoint(const _input_& i);
     Adjoint() = delete;
@@ -34,7 +37,8 @@ public:
 
     static VectorXd RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi);
-//z ciekawosci: po co sa te statyczne metody?
+// z ciekawosci: po co sa te statyczne metody?
+// Można dzięki nim otrzymać wektor prawych stron bez tworzenia obiektu klasy Adjoint explicite.
     VectorXd RHS3d(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
         const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const;
 

@@ -24,6 +24,7 @@ VectorXd joint2AbsAngles(const VectorXd& alpha);
 Matrix3d massMatrix(const int id, const _input_& input);
 Vector3d Q1_init(int id, const VectorXd& alphaAbs, const double& u, const _input_& input);
 Vector3d Q1_init(int id, const VectorXd &alphaAbs, const VectorXd &dAlphaJoint, const double& u, const _input_ &input);
+VectorXd Q1_global(const VectorXd &q, const VectorXd &dq, const double& u, const _input_ &input);
 void logTotalEnergy(const double& t, const VectorXd& y, const VectorXd& dy, const VectorXd& uVec, const _input_& input);
 dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _input_& input);
 dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, const _input_& input);
@@ -32,6 +33,9 @@ double interpolateControl(const double& t, const VectorXd& uVec, const _input_& 
 double trapz(const VectorXd& x, const _input_& input);
 double trapz(const int ind, const VectorXd& x, const _input_& input);
 void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj, const VectorXd& uVec, const _input_& input);
+void write_vector_to_file(const std::vector<double>& myVector, std::string filename);
+std::vector<double> read_vector_from_file(std::string filename);
+
 
 // solvers.cpp
 _solution_ RK_solver(const _input_& input);
