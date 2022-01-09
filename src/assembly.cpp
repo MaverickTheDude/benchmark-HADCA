@@ -46,15 +46,37 @@ Assembly& Assembly::operator=(const Assembly& A) {
 Assembly::Assembly(const int id, const VectorXd& alphaAbs, 
             const VectorXd& pjoint, const double& u, const _input_& input) :
     ksi(ksi_coefs(id, alphaAbs, pjoint, input)) ,
-    Q1Acc(Q1_init(id, alphaAbs, u, input)) ,
+    // Q1Acc(Q1_init(id, alphaAbs, u, input)) ,
     S12(SAB("s12", id, alphaAbs, input)) ,
     ptrAsmA(nullptr), ptrAsmB(nullptr)  { }
 
 Assembly::Assembly(Assembly& AsmA, Assembly& AsmB) :
     ksi(ksi_coefs(AsmA.ksi, AsmB.ksi)) ,
-    Q1Acc(AsmA.Q1Acc + AsmA.S12 * AsmB.Q1Acc) ,
+    // Q1Acc(AsmA.Q1Acc + AsmA.S12 * AsmB.Q1Acc) ,
     S12(AsmA.S12 * AsmB.S12) ,
     ptrAsmA(&AsmA), ptrAsmB(&AsmB)  { }
+
+void Assembly::setCoefArtForces(int i, const VectorXd& alphaAbs, const VectorXd& dalpha, const double& u_ctrl, const _input_& input) {
+	Q1Acc = Q1_init(i, alphaAbs, dalpha, u_ctrl, input);
+}
+
+void Assembly::assembleForce(Assembly& AsmA, Assembly& AsmB) {
+    Q1Acc = AsmA.Q1Acc + AsmA.S12 * AsmB.Q1Acc;
+}
+
+void Assembly::setAccForces(const Assembly& Asm) {
+	Q1Acc = Asm.Q1Acc;
+}
+
+void Assembly::setArtForces(const Assembly& Asm) {
+	Q1Art = Asm.Q1Art;
+	Q2Art = Asm.Q2Art;
+}
+
+void Assembly::connect_base_artForces() {
+	Q1Art = Q1Acc;
+	Q2Art = Vector3d::Zero();
+}
 
 void Assembly::connect_base_body() {
     Matrix<double, 3, 2> D;
@@ -72,6 +94,27 @@ void Assembly::connect_base_bodyAcc() {
 	Matrix2d c = - D.transpose() * ksi.k11() * D;
 	L1 = D * c.ldlt().solve(D.transpose()) * ksiAcc_10;
 	L2 << 0.0, 0.0, 0.0;
+}
+
+void Assembly::disassembleVel() {
+    Matrix<double, 3,2> D;
+    D << 1, 0, 0, 1, 0, 0; // D_rot is hardcoded
+	Matrix2d C = -D.transpose() * (ptrAsmB->ksi.k11() + ptrAsmA->ksi.k22()) * D;
+	Matrix3d W =  D * C.ldlt().solve(D.transpose());
+	Vector2d b =  D.transpose() * (ptrAsmB->ksi.k10() - ptrAsmA->ksi.k20());
+	Vector3d beta = D * C.ldlt().solve(b);
+
+	ptrAsmB->T1 = W * ptrAsmB->ksi.k12() * T2 - W * ptrAsmA->ksi.k21() * T1 + beta;
+	ptrAsmA->T2 = (-1) * ptrAsmB->T1;
+	ptrAsmA->T1 = T1;
+	ptrAsmB->T2 = T2;
+}
+
+void Assembly::disassembleForce() {
+    ptrAsmB->Q1Art =  ptrAsmB->Q1Acc - ptrAsmB->S12 * Q2Art;
+	ptrAsmA->Q2Art = -ptrAsmB->Q1Art;
+	ptrAsmA->Q1Art =  Q1Art;
+	ptrAsmB->Q2Art =  Q2Art;
 }
 
 void Assembly::disassembleAll() {
@@ -93,6 +136,18 @@ void Assembly::disassembleAll() {
 	ptrAsmB->Q2Art =  Q2Art;
 }
 
+void Assembly::setVel(const Assembly& Asm) {
+	T1 = Asm.T1;
+	T2 = Asm.T2;
+}
+
+void Assembly::setAll(const Assembly& Asm) {
+	T1 = Asm.T1;
+	T2 = Asm.T2;
+	Q1Art = Asm.Q1Art;
+	Q2Art = Asm.Q2Art;
+}
+
 Vector3d Assembly::calculate_V1() const {
 	return ksi.k11()*T1 + ksi.k12()*T2 + ksi.k10();
 }
@@ -107,13 +162,6 @@ Vector3d Assembly::calculate_dV1() const {
 
 Vector3d Assembly::calculate_dV2() const {
 	return ksi.k21()*L1 + ksi.k22()*L2 + ksiAcc_20;
-}
-
-void Assembly::setAll(const Assembly& Asm) {
-	T1 = Asm.T1;
-	T2 = Asm.T2;
-	Q1Art = Asm.Q1Art;
-	Q2Art = Asm.Q2Art;
 }
 
 void Assembly::setKsiAcc(const int id, const VectorXd& alphaAbs, const VectorXd& dAlphaAbs, const MatrixXd& P1art, const _input_& input) {

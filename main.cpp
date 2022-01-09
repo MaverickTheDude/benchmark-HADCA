@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
 # endif 
 
     /* SETTINGS */
-    double inputSignal = 2.0;
+    double inputSignal = 0.5;
     double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0001;
     double lb = -HUGE_VAL, ub = HUGE_VAL;
 
@@ -60,9 +60,9 @@ solutionFwd.show_xStatus(u_zero, *input);
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-#define OPT false
-#if !OPT // check adjoint equations or initial setup
     solutionFwd.print(); // dla porownania
+#define OPT false
+#if !true // check adjoint equations or initial setup
 	{
 		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();
@@ -75,7 +75,7 @@ solutionFwd.show_xStatus(u_zero, *input);
 #if OPT // optimize
     nlopt::opt opt(nlopt::LD_MMA, input->Nsamples); // LD_SLSQP  LD_MMA  LD_CCSAQ  AUGLAG  G_MLSL_LDS (useless: GN_DIRECT_L, GN_ISRES)
     opt.set_xtol_rel(1e-4);
-    opt.set_maxeval(100);
+    opt.set_maxeval(40);
     
     /* opt. globalna + lokalna G_MLSL_LDS */
 /*     nlopt::opt opt_aux(nlopt::LD_MMA, input->Nsamples);
@@ -123,14 +123,14 @@ static double costFunction(unsigned int n, const double *x, double *grad, void *
 {
     _input_* input = static_cast<_input_*>(my_func_data);
     Map<const VectorXd> u(x, input->Nsamples);
-	_solution_ solutionFwd = RK_solver(u, *input);
+	_solution_ solutionFwd = RK_solver_odeInt(u, *input);
 
     const double& x_tf = solutionFwd.alpha(0, input->Nsamples-1);
     double S_tf  = input->w_Sq * x_tf * x_tf;
     double alpha = input->w_hq, beta = input->w_hdq; double gama = input->w_hsig;
 
     if (grad) {
-    	_solutionAdj_ solution = RK_AdjointSolver(u, solutionFwd, *input, _solutionAdj_::HDCA);
+    	_solutionAdj_ solution = RK_AdjointSolver_odeInt(u, solutionFwd, *input, _solutionAdj_::HDCA);
         for (int i = 0; i < input->Nsamples; i++)
             grad[i] =( 2*gama*u(i) - solution.c(0,i) ) * input->dt;
         cout << "grad evaluation " << endl;

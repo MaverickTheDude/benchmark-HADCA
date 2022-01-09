@@ -10,9 +10,10 @@
 #include <boost/numeric/odeint/stepper/runge_kutta_cash_karp54.hpp>
 #include <boost/numeric/odeint/integrate/integrate_times.hpp>
 #include <omp.h>
-    #include <iostream>
+#include <iostream>
 using std::vector;
 
+#define SHOW_PROGRESS true
 
 _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
     using namespace boost::numeric;
@@ -49,7 +50,7 @@ _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
     typedef odeint::controlled_runge_kutta< error_stepper_type > controlled_stepper_type;
     controlled_stepper_type controlled_stepper;
 
-    size_t steps = odeint::integrate_times(controlled_stepper , rho , 
+    /* size_t steps = */ odeint::integrate_times(controlled_stepper , rho , 
                     y0, T.begin() , T.end(), input.dt, 
                     odeint_observer(input, rho, solution, uVec, b_alphaAbs, b_dAlphaAbs, b_P1art, b_tree) );
 
@@ -59,8 +60,8 @@ _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
 _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& solutionFwd, 
                                       const _input_& input, const int& formulation) {
     using namespace boost::numeric;
-    if (formulation == _solutionAdj_::GLOBAL)
-        throw std::runtime_error("RK_AdjointSolver_odeInt: unsuported formulation (GLOBAL)");
+    if (formulation == _solutionAdj_::GLOBAL) {
+        throw std::runtime_error("RK_AdjointSolver_odeInt: unsuported formulation (GLOBAL)"); }
 	const int Nbodies = input.Nbodies;
     _solutionAdj_ solution(input);
 
@@ -79,7 +80,7 @@ _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& so
     typedef odeint::controlled_runge_kutta< error_stepper_type > controlled_stepper_type;
     controlled_stepper_type controlled_stepper;
 
-    size_t steps = odeint::integrate_times(controlled_stepper, rho, 
+    /* size_t steps = */ odeint::integrate_times(controlled_stepper, rho, 
                     y0, T.begin(), T.end(), input.dt, 
                     odeint_observer_adj(input, rho, solutionFwd, solution) );
 
@@ -250,6 +251,15 @@ void odeint_observer_adj::operator()( const state_type &y , double tau )
                     // Phi.d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * stateAbs.ksi ).norm();
         solution.setNorms(ind, norms);
     }
+
+#if SHOW_PROGRESS
+    static int cnt = 0;
+    double Tcnt = input.Tk / 10 * cnt;
+    if (tau >= Tcnt) {
+        std::cout << "Adjoint progress: " << t << "s (" << cnt * 10 << "%)" << std::endl;
+        ++cnt;
+    }
+#endif
 }
 
 // ======== FORWARD ========
@@ -264,11 +274,11 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     VectorXd alpha  = VectorXd::Map(y.data()+n, n);
     this->alphaAbs  = joint2AbsAngles(alpha);
     VectorXd dalpha(n), dpjoint(n);
-    double u;
+    double u_ctrl;
     if (input.Nsamples < 4)
-        u = 0;     // we simulate only how fast RHS gets evaluated, so we don't need that
+        u_ctrl = 0;     // we simulate only how fast RHS gets evaluated, so we don't need that
     else
-        u = interpolateControl(t, uVec, input);
+        u_ctrl = interpolateControl(t, uVec, input);
     
 
     // vector<vector<Assembly, aaA >, aaA > tree;
@@ -296,7 +306,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     vec_private.reserve(input.Nbodies / nthreads);
 #pragma omp for schedule(static) nowait
     for(int i = 0; i < input.Nbodies; i++) {
-        vec_private.emplace_back(i, alphaAbs, pjoint, u, input);
+        vec_private.emplace_back(i, alphaAbs, pjoint, u_ctrl, input);
     }
     prefix[ithread+1] = vec_private.size();
 #pragma omp barrier
@@ -353,7 +363,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     /* base body connection */
     Assembly& AssemblyS = tree[input.Ntiers-1][0];
 	AssemblyS.connect_base_body();
-	AssemblyS.disassembleAll();
+	AssemblyS.disassembleVel();
 
     const int prelastTier = input.Ntiers-2;
 	for (int i = prelastTier; i > 0; i--) {
@@ -362,11 +372,11 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 
 #pragma omp parallel for schedule(static)
         for (int j = 0; j < end_of_branch; j++)
-            tree[i].at(j).disassembleAll();
+            tree[i].at(j).disassembleVel();
 
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1) {
-			tree[i-1].back().setAll(tree[i].back());
+			tree[i-1].back().setVel(tree[i].back());
 		}
 	}
 
@@ -386,17 +396,71 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 	}
     this->dAlphaAbs = joint2AbsAngles(dalpha);
 
-// TODO: Parallelize (???)
-    /* descendants term calculation */
-    MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
-    Vector3d sum = Vector3d::Zero();
-    const int preLastBody = input.Nbodies-2;
-    for (int i = preLastBody; i >= 0; i--) {
-        const Matrix3d dSc2 = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
-        const Matrix3d dS1c =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
-        sum += (dSc2 + dS1c) * P1art.col(i+1);
-		des.col(i) = sum;
+    /* articulated forces calculation */
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < input.tiersInfo[0]; i++) {
+        leafBodies[i].setCoefArtForces(i, alphaAbs, dalpha, u_ctrl, input);
     }
+
+    for (int i = 1; i < input.Ntiers; i++) {                // assembly
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
+        const int Nparents = input.tiersInfo[i-1];
+        const int Nparents_even = Nparents / 2; // # of nodes above current branch (-1 if they're odd)
+
+        /* core loop of HDCA algorithm */
+#pragma omp parallel for schedule(static)
+        for (int j = 0; j < Nparents_even; j++)
+            branch[j].assembleForce(upperBranch[2*j], upperBranch[2*j+1]);
+        
+        /* case: odd # elements */
+        if (Nparents % 2 == 1)
+			branch.back().setAccForces(upperBranch.back());
+    }
+
+    /* base body connection */
+    AssemblyS.connect_base_artForces();
+    AssemblyS.disassembleForce();
+
+    for (int i = prelastTier; i > 0; i--) {                     // disassembly
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
+        const int Nparents_even = input.tiersInfo[i-1] / 2;
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Nparents_even; j++)
+			branch.at(j).disassembleForce();
+
+        /* case: odd # elements */
+		if (input.tiersInfo[i-1] % 2 == 1)
+			upperBranch.back().setArtForces(branch.back());
+	}
+
+
+//--- descendants term calculation (reverse cummulative sum) -------
+	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+    Vector3d sum = Vector3d::Zero();
+	MatrixXd sumThr = MatrixXd::Zero(3, omp_get_max_threads()+1);
+    const int preLastBody = input.Nbodies-2;
+
+	// Oblicz cumsum w podprzedzialach i zapisz ostatnia (najwieksza) wartosc w tablicy sumThr
+# pragma omp parallel for schedule(static) private(sum)
+	for (int i = preLastBody; i >= 0; i--) {
+        const Matrix3d& dSc2_A = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
+        const Matrix3d& dS1c_B =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
+		sum += (dSc2_A + dS1c_B) * P1art.col(i+1);
+		des.col(i) = sum;
+		sumThr.col(omp_get_thread_num()+1) = sum;
+	}
+
+	// Oblicz poprawke dla poszczegolnych przedzialow
+	for (int i=1; i < omp_get_max_threads(); i++)
+		sumThr.col(i) += sumThr.col(i-1);
+
+	// Zastosuj poprawke
+# pragma omp parallel for schedule(static)
+	for (int i = preLastBody; i >= 0; i--)
+		des.col(i) += sumThr.col(omp_get_thread_num());
 
     /* joint dp from the articulated quantities */
 #pragma omp parallel for schedule(static)
@@ -504,4 +568,13 @@ void odeint_observer::operator()( const state_type &y , double t )
     
     solution.setD2alpha(index, d2alpha);
     solution.setLambda( index, lambda);
+
+#if SHOW_PROGRESS
+    static int cnt = 0;
+    double Tcnt = input.Tk / 10.0 * cnt;
+    if (t >= Tcnt) {
+        std::cout << "Forward progress: " << t << "s (" << cnt * 10 << "%)" << std::endl;
+        ++cnt;
+    }
+#endif
 }

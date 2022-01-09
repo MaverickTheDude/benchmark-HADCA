@@ -361,9 +361,32 @@ Matrix3d massMatrix(const int id, const _input_& input)
 Vector3d Q1_init(int id, const VectorXd &alphaAbs, const double& u, const _input_ &input)
 {
     Vector3d Q_out = Vector3d::Zero();
+    /* gravity */
     Q_out(1) = - M_GRAV * input.pickBodyType(id).m;
     Q_out = SAB("s1C", id, alphaAbs, input) * Q_out;
+    /* control force */
     if (id == 0) Q_out(0) = u;
+    return Q_out;
+}
+
+Vector3d Q1_init(int id, const VectorXd &alphaAbs, const VectorXd &dAlphaJoint, const double& u, const _input_ &input)
+{
+    Vector3d Q_out = Vector3d::Zero();
+    /* gravity */
+    Q_out(1) = - M_GRAV * input.pickBodyType(id).m;
+    Q_out = SAB("s1C", id, alphaAbs, input) * Q_out;
+    const double c_cart = input.pickBodyFriction(0);
+    const double c_pend = input.pickBodyFriction(1);
+    const double& dx = dAlphaJoint(0);
+    if (id == 0) {
+        Q_out(0) = u - c_cart * dx;    /* control + friction force */
+    }
+    else {
+        /* note: Q_out uwzglednia tylko tlumienie *swojego* zlacza, ale juz nie sasiada
+         * prawdopodobnie przez zlaczowy opis wspolrzednych. Blad: Q_out(2) += c_pend * (-dphi_i + dphi_j) */
+        const double& dphi_i = dAlphaJoint(id);
+        Q_out(2) += -c_pend * dphi_i;   /* friction torque */
+    }
     return Q_out;
 }
 
@@ -373,12 +396,17 @@ static double calculateTotalEnergy(const double& t, const VectorXd& y, const Vec
     VectorXd alpha  = y.tail(n);
     VectorXd dalpha = dy.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
+    VectorXd omega    = joint2AbsAngles(dalpha);
     VectorXd q  = jointToAbsolutePosition(alpha, input);
     VectorXd dq = jointToAbsoluteVelocity(alpha, dalpha, input);
     double energy = 0.0;
 
+    static MatrixXd powerDamp = MatrixXd::Zero(n, input.Nsamples);
+    int ind = atTime(t, VectorXd::LinSpaced(input.Nsamples, 0, input.Tk), input).first;
+
     for (int i = 0; i < input.Nbodies; ++i) {
-        double m = input.pickBodyType(i).m;
+        double m      = input.pickBodyType(i).m;
+        double c_fric = input.pickBodyFriction(i);
         Matrix3d M = massMatrix(i, input);
         Matrix3d S1c = SAB("s1C", i, alphaAbs, input);
         Vector3d V  = dq.segment(3 * i, 3);
@@ -387,10 +415,15 @@ static double calculateTotalEnergy(const double& t, const VectorXd& y, const Vec
 
         energy += 0.5 * V.transpose() * M * V + 
                   m * M_GRAV * qi(1);
+
+        /* damping */
+        powerDamp(i, ind) = - c_fric * dalpha(i) * omega(i);
+        energy -= trapz(ind, powerDamp.row(i), input);
     }
+    /* control signal */
+    double x  = alpha(0);
     double u = interpolateControl(t, uVec, input);
-    double x1 = y(input.Nbodies);
-    energy -= u * x1;
+    energy -= u * x;
 
     return energy;
 }
@@ -592,6 +625,19 @@ double trapz(const VectorXd& x, const _input_& input) {
     return out;
 }
 
+double trapz(const int ind, const VectorXd& x, const _input_& input) {
+    /* Numeric trapezoidal integration: * * * * *  ...  *     * 
+     *                                  0 1 2 3 4     (N-2) (N-1)
+     * x1 to x(N-2) times dt. Border nodes times dt/2  */
+    const int Nsize = ind+1;
+    const double& dt = input.dt;
+    if (Nsize == 1) return 0.0;
+    if (Nsize == 2) return (x(0)+x(1))*dt/2;
+    double out = dt * x.segment(1, Nsize-2).sum();
+    out += (x(0)+x(Nsize-1))*dt/2;
+    return out;
+}
+
 void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj, 
 					 const VectorXd& uVec, const _input_& input) {
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
@@ -603,7 +649,7 @@ void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj,
 
 	double gama = input.w_hsig;
 	const int N = solAdj.e.cols();
-	const int n = solAdj.e.rows();
+	// const int n = solAdj.e.rows();
 
 	MatrixXd sol(5, N);
 	sol.row(0) = solFwd.T;

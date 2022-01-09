@@ -28,6 +28,7 @@ friend void PhiTimeDerivatives::constraints::setStartConditions(_input_ &input);
         return (bodyId == 0) ? bodyTypes[0] : bodyTypes[1];
     }
     void setTk(double tk);
+    double pickBodyFriction(int bodyId) const;
 
 public:
     const int Nbodies;
@@ -44,6 +45,7 @@ public:
     double w_hsig= 0.0;
     double w_Sq  = 0.0;
     double w_Sdq = 0.0;
+
 private:
     void setPJointAndSigma(void);
 };

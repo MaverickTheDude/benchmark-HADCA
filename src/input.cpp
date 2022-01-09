@@ -1,5 +1,6 @@
 #include "../include/input.h"
 #include "../include/utils.h"
+#include "../include/constants.h"
 #include "../Eigen/Dense"
 
 using namespace Eigen;
@@ -32,6 +33,10 @@ _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
 		tiersInfo[i] = Ntmp;
 		Ntmp = static_cast<int>( ceil(static_cast<double>(Ntmp) / 2.0) );
 	}
+}
+
+double _input_::pickBodyFriction(int bodyId) const {
+    return bodyId == 0 ? _c_cart_ : _c_pend_;
 }
 
 void _input_::setTk(double tk) { Tk = tk; }

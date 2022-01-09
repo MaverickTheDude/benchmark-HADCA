@@ -18,11 +18,11 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     VectorXd alpha  = y.tail(n);
     VectorXd alphaAbs = joint2AbsAngles(alpha);
     VectorXd dalpha(n), dpjoint(n);
-    double u;
+    double u_ctrl;
     if (input.Nsamples < 4)
-        u = 0;     // we simulate only how fast RHS gets evaluated, so we don't need that
+        u_ctrl = 0;     // we simulate only how fast RHS gets evaluated, so we don't need that
     else
-        u = interpolateControl(t, uVec, input);
+        u_ctrl = interpolateControl(t, uVec, input);
     
 
     using aaA = aligned_allocator<Assembly>;
@@ -51,7 +51,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     vec_private.reserve(input.Nbodies / nthreads);
 #pragma omp for schedule(static) nowait
     for(int i = 0; i < input.Nbodies; i++) {
-        vec_private.emplace_back(i, alphaAbs, pjoint, u, input);
+        vec_private.emplace_back(i, alphaAbs, pjoint, u_ctrl, input);
     }
     prefix[ithread+1] = vec_private.size();
 #pragma omp barrier
@@ -108,7 +108,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
     /* base body connection */
     Assembly& AssemblyS = tree[input.Ntiers-1][0];
 	AssemblyS.connect_base_body();
-	AssemblyS.disassembleAll();
+	AssemblyS.disassembleVel();
 
     const int prelastTier = input.Ntiers-2;
 	for (int i = prelastTier; i > 0; i--) {
@@ -117,11 +117,11 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
 
 #pragma omp parallel for schedule(static)
         for (int j = 0; j < end_of_branch; j++)
-            tree[i].at(j).disassembleAll();
+            tree[i].at(j).disassembleVel();
 
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1) {
-			tree[i-1].back().setAll(tree[i].back());
+			tree[i-1].back().setVel(tree[i].back());
 		}
 	}
 
@@ -142,17 +142,79 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
 	}
     VectorXd dAlphaAbs = joint2AbsAngles(dalpha);
 
-// TODO: Parallelize (???)
-    /* descendants term calculation */
-    MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+    /* articulated forces calculation */
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < input.tiersInfo[0]; i++) {
+        leafBodies[i].setCoefArtForces(i, alphaAbs, dalpha, u_ctrl, input);
+    }
+
+    for (int i = 1; i < input.Ntiers; i++) {                // assembly
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
+        const int Nparents = input.tiersInfo[i-1];
+        const int Nparents_even = Nparents / 2; // # of nodes above current branch (-1 if they're odd)
+
+        /* core loop of HDCA algorithm */
+#pragma omp parallel for schedule(static)
+        for (int j = 0; j < Nparents_even; j++)
+            branch[j].assembleForce(upperBranch[2*j], upperBranch[2*j+1]);
+        
+        /* case: odd # elements */
+        if (Nparents % 2 == 1)
+			branch.back().setAccForces(upperBranch.back());
+    }
+
+    /* base body connection */
+    AssemblyS.connect_base_artForces();
+    AssemblyS.disassembleForce();
+
+    for (int i = prelastTier; i > 0; i--) {                     // disassembly
+        vector<Assembly, aaA >& branch = tree[i];
+        vector<Assembly, aaA >& upperBranch = tree[i-1];
+        const int Nparents_even = input.tiersInfo[i-1] / 2;
+
+#pragma omp parallel for schedule(static)
+		for (int j = 0; j < Nparents_even; j++)
+			branch.at(j).disassembleForce();
+
+        /* case: odd # elements */
+		if (input.tiersInfo[i-1] % 2 == 1)
+			upperBranch.back().setArtForces(branch.back());
+	}
+
+
+//--- descendants term calculation (reverse cummulative sum) -------
+	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
     Vector3d sum = Vector3d::Zero();
+	MatrixXd sumThr = MatrixXd::Zero(3, omp_get_max_threads()+1);
     const int preLastBody = input.Nbodies-2;
-    for (int i = preLastBody; i >= 0; i--) {
+
+	// Oblicz cumsum w podprzedzialach i zapisz ostatnia (najwieksza) wartosc w tablicy sumThr
+# pragma omp parallel for schedule(static) private(sum)
+	for (int i = preLastBody; i >= 0; i--) {
+        const Matrix3d& dSc2_A = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
+        const Matrix3d& dS1c_B =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
+		sum += (dSc2_A + dS1c_B) * P1art.col(i+1);
+		des.col(i) = sum;
+		sumThr.col(omp_get_thread_num()+1) = sum;
+	}
+
+	// Oblicz poprawke dla poszczegolnych przedzialow
+	for (int i=1; i < omp_get_max_threads(); i++)
+		sumThr.col(i) += sumThr.col(i-1);
+
+	// Zastosuj poprawke
+# pragma omp parallel for schedule(static)
+	for (int i = preLastBody; i >= 0; i--)
+		des.col(i) += sumThr.col(omp_get_thread_num());
+
+    /* descendants term calculation - sequential */
+/*     for (int i = preLastBody; i >= 0; i--) {
         const Matrix3d dSc2 = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
         const Matrix3d dS1c =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
         sum += (dSc2 + dS1c) * P1art.col(i+1);
 		des.col(i) = sum;
-    }
+    } 
 
     /* joint dp from the articulated quantities */
 #pragma omp parallel for schedule(static)

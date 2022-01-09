@@ -35,13 +35,22 @@ public:
     Assembly(const int id, const VectorXd& alphaAbs, const VectorXd& pjoint, const double& u, const _input_& input);
     Assembly(Assembly& AsmA, Assembly& AsmB);
     Assembly();
+    void assembleForce(Assembly& AsmA, Assembly& AsmB);
+    void setArtForces(const Assembly& Asm);
     Assembly(const Assembly&) = default; // note: shallow copy with default ctor is exactly what we need
     Assembly& operator=(const Assembly&);
     void connect_base_body();
     void disassembleAll();
+    void disassembleVel();
+    void disassembleForce();
     Vector3d calculate_V1() const;
     Vector3d calculate_V2() const;
+    void setVel(const Assembly&);
     void setAll(const Assembly&);
+    void setCoefArtForces(int i, const VectorXd& alphaAbs, const VectorXd& dalpha, const double& u_ctrl, const _input_& input);
+    void setAccForces(const Assembly& Asm);
+    void connect_base_artForces();
+
 
     /* acceleration level functions */
     void setKsiAcc(const int id, const VectorXd& alphaAbs, const VectorXd& dAlphaAbs, const MatrixXd& P1art, const _input_& input);
