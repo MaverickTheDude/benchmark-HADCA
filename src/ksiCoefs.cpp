@@ -88,8 +88,8 @@ ksi_coefs::ksi_coefs(const int id, const dataAbsolute& data, const double& u, co
     Vector3d eta = data.eta.segment(3*id, 3);
     Vector3d xi  = data.ksi.segment(3*id, 3);
 
-    const double sign = -1.0; // d/d(t) = - d/d(tau) ==> the time goes backwards
-    const Vector3d rhs = Adjoint::RHS3d(id, input, data.q, data.dq, data.d2q, data.lambda, (VectorXd(1) << u).finished(), eta, xi);
+    const double sign = -1.0;
+    const Vector3d rhs = Adjoint::RHS3d(id, input, data.q, data.dq, data.d2q, data.lambda, (VectorXd(1) << u).finished(), data.eta, data.ksi);
     rhs10 =       rhs;
     rhs20 = S21 * rhs;
 

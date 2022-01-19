@@ -36,11 +36,10 @@ public:
         const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
 
     static VectorXd RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
-        const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi);
-// z ciekawosci: po co sa te statyczne metody?
-// Można dzięki nim otrzymać wektor prawych stron bez tworzenia obiektu klasy Adjoint explicite.
+        const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi);
+
     VectorXd RHS3d(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q, const VectorXd& lambda,
-        const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const;
+        const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
 
 private:
     const _input_& input;
@@ -54,5 +53,5 @@ private:
     VectorXd __RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
         const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
     VectorXd __RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
-        const VectorXd& lambda, const VectorXd& u, const Vector3d& eta, const Vector3d& ksi) const;
+        const VectorXd& lambda, const VectorXd& u, const VectorXd& eta, const VectorXd& ksi) const;
 };

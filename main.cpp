@@ -54,8 +54,8 @@ int main(int argc, char* argv[]) {
     /* initialize */
     _input_* input = new _input_(Nbodies);
     VectorXd u_zero = VectorXd::Constant(input->Nsamples, inputSignal);
-    _solutionGlobal_ solutionFwdG = RK_GlobalSolver_odeInt(u_zero, *input);
-    u_zero = (-1.0) * VectorXd::Map(solutionFwdG.get_signal().data(), input->Nsamples);
+    // _solutionGlobal_ solutionFwdG = RK_GlobalSolver_odeInt(u_zero, *input);
+    // u_zero = (-1.0) * VectorXd::Map(solutionFwdG.get_signal().data(), input->Nsamples);
 
     _solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
     solutionFwd.show_xStatus(u_zero, *input);
@@ -64,10 +64,10 @@ int main(int argc, char* argv[]) {
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-    solutionFwd.print(); // dla porownania
-    solutionFwdG.print(); // dla porownania
+    solutionFwd.print();
+    // solutionFwdG.print();
 #define OPT false
-#if !true // check adjoint equations or initial setup
+#if !OPT // check adjoint equations or initial setup
 	{
 		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();

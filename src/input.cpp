@@ -11,7 +11,7 @@ using namespace Eigen;
 #define TIME_STEP 0.01
 #define LOG_ENERGY true
 #define LOG_CONSTR true
-#define CALCULATE_SIGNAL true
+#define CALCULATE_SIGNAL false // (dotyczy tylko sformulowania globalnego)
 
 _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
                                   dalpha0(Nbodies),   pjoint0(Nbodies),

@@ -34,6 +34,10 @@ namespace task
         virtual MatrixXd dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const = 0;
         virtual MatrixXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const = 0;
 
+        virtual Vector3d q(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const = 0;
+        virtual Vector3d dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const = 0;
+        virtual Vector3d ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const = 0;
+
         virtual VectorXd q(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const = 0;
         virtual VectorXd dq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const = 0;
         virtual VectorXd ddtdq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const = 0;
@@ -62,8 +66,39 @@ namespace task
         MatrixXd dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const;
         MatrixXd ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const;
 
+        Vector3d q(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const ;
+        Vector3d dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const;
+        Vector3d ddtdq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const;
+
         VectorXd q(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const;
         VectorXd dq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const;
         VectorXd ddtdq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& ksi) const;
+    };
+
+    class F_2 : public F_1
+    {
+        /**
+         * Class F_2 adds viscous friction in joints to F_1. As for the approach
+         * of dealing with joints it follows the one used in task::Phi class.
+         */
+    public:
+        F_2() = delete;
+        F_2(const _input_& i);
+        ~F_2() = default;
+        F_2(const F_2&) = delete;
+        F_2& operator=(const F_2&) = delete;
+
+        VectorXd operator()(const VectorXd& q, const VectorXd& dq, const VectorXd& u) const;
+        MatrixXd dq(const VectorXd &q, const VectorXd &dq, const VectorXd &u) const;
+
+        VectorXd operator()(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const;
+        MatrixXd dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u) const;
+
+        Vector3d dq(const int bodyNumber, const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const;
+
+        VectorXd dq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const VectorXd& eta) const;
+
+    private:
+        const int jointsNumber;
     };
 }
