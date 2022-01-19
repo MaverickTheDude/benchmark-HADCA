@@ -82,19 +82,19 @@ void _solution_::print() const {
 	// MatrixXd sol(3*n+1, N);
 
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = d2alpha;
-	sol.block(1+n, 0, n, N) = dalpha;
+	sol.block(1, 0, n, N) = dalpha;
+	sol.block(1+n, 0, n, N) = alpha;
 	// sol.block(1+n, 0, 2*n, N) = lambda;
 
 	outFile << sol;
 	outFile.close();
 }
 
-void _solution_::print(const VectorXd& u) const {
+void _solution_::print(const VectorXd& u, const VectorXd& initial_traj) const {
 
 	IOFormat exportFmt(FullPrecision, 0, " ", "\n", "", "", "", "");
 	std::ofstream outFile;
-	outFile.open("../output/resultsForward.txt");
+	outFile.open("../output/results.txt");
 
 	if (outFile.fail() )
 		throw std::runtime_error("_solution_::print(const VectorXd&): nie udalo sie otworzyc pliku.");
@@ -115,7 +115,7 @@ void _solution_::print(const VectorXd& u) const {
 	if (outFile.fail() )
 		throw std::runtime_error("_solution_::print(const VectorXd&): nie udalo sie otworzyc pliku (2).");
 
-	MatrixXd solCheck(8, N);
+	MatrixXd solCheck(9, N);
 	solCheck.row(0) = T;
 	solCheck.row(1) = u;
 	solCheck.row(2) = alpha.row(0);    // x
@@ -124,9 +124,11 @@ void _solution_::print(const VectorXd& u) const {
 	solCheck.row(5) = dalpha.row(0);   // dx
 	solCheck.row(6) = dalpha.row(1);   // dphi1
 	solCheck.row(7) = dalpha.row(n-1); // dphi_n
+	solCheck.row(8) = initial_traj;	   // initial trajectory
 
-	outFile << sol;
+	outFile << solCheck;
 	outFile.close();
+	std::cout << "=== printed optimization details to \"checkOpt.txt\" ===" << std::endl;
 }
 
 const std::vector<double>& _solutionGlobal_::get_signal() const {
@@ -155,7 +157,7 @@ void _solutionGlobal_::print() const {
 	sol.row(0) = T;
 	sol.block(1, 0, 3, N) = cartPosVelAcc;
 	if (calculateSignal)
-		sol.row(4) = lambda_x0;
+		sol.row(4) = -1.0 * lambda_x0;
 
 	outFile << sol;
 	outFile.close();
@@ -199,8 +201,8 @@ void _solutionAdj_::printGlobal() const {
 	const int n = eta.rows();
 	MatrixXd sol(2*n+1 + 3, N);
 	sol.row(0) = T;
-	sol.block(1, 0, n, N) = eta;
-	sol.block(1+n, 0, n, N) = ksi;
+	sol.block(1, 0, n, N) = ksi;
+	sol.block(1+n, 0, n, N) = eta;
 	sol.block(1+2*n, 0, 3, N) = norms;
 	outFile << sol;
 	outFile.close();

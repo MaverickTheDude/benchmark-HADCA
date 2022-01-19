@@ -756,16 +756,23 @@ void print_checkGrad(const _solution_& solFwd, const _solutionAdj_& solAdj,
 		throw std::runtime_error("print_checkGrad(...): nie udalo sie otworzyc pliku.");
 
 	double gama = input.w_hsig;
-	const int N = solAdj.e.cols();
-	// const int n = solAdj.e.rows();
+	const int N = input.Nsamples;
 
 	MatrixXd sol(5, N);
 	sol.row(0) = solFwd.T;
-	sol.row(1) = solAdj.c.row(0);									// c_adj
-	for (int i = 0; i < input.Nsamples; i++)						// 
-		sol(2,i) = ( 2*gama*uVec(i) - solAdj.c(0,i) ) * input.dt;	// gradient
 	sol.row(3) = solFwd.alpha.row(0);								// x
 	sol.row(4) = solFwd.dalpha.row(0);								// dx
+	if (solAdj.c.cols() == input.Nsamples) {
+        sol.row(1) = solAdj.c.row(0);									// c_adj
+        for (int i = 0; i < input.Nsamples; i++)						// 
+            sol(2,i) = ( 2*gama*uVec(i) - solAdj.c(0,i) ) * input.dt;	// gradient
+    }
+    else {
+        std::cout << "recording solution from GLOBAL adjoint sens. analysis" << std::endl;
+        sol.row(1) = solAdj.ksi.row(0);									// c_adj
+	    for (int i = 0; i < input.Nsamples; i++)						// 
+		    sol(2,i) = ( 2*gama*uVec(i) - solAdj.ksi(0,i) ) * input.dt;	// gradient
+    }
 
 	outFile << sol;
 	outFile.close();

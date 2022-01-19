@@ -149,9 +149,7 @@ VectorXd F_1::q(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const 
     VectorXd rhs = VectorXd::Zero(3 * input.Nbodies);
 
     for(int i = 0; i < input.Nbodies; i++)
-    {
-        rhs.segment(3 * i, 3) = F_1::q(i, q, dq, u) * ksi.segment(3 * i , 3);
-    }
+        rhs.segment(3 * i, 3) = F_1::q(i, q, dq, u) * ksi; 
 
     return rhs;
 }
@@ -468,9 +466,7 @@ VectorXd F_2::dq(const VectorXd& q, const VectorXd& dq, const VectorXd& u, const
     VectorXd F_2_dq = F_1::dq(q, dq, u, eta);
 
     for(int i = 0; i < input.Nbodies; i++)
-    {
-        F_2_dq.segment(3 * i, 3) = F_2::dq(i, q, dq, u) * eta.segment(3 * i , 3);
-    }
+        F_2_dq.segment(3 * i, 3) = F_2::dq(i, q, dq, u) * eta;
 
     return F_2_dq;
 }

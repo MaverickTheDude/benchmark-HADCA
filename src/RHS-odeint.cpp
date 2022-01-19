@@ -649,8 +649,12 @@ void RHS_GLOBAL_ODE::operator() (const state_type &y, state_type &dy , const dou
     const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
     const VectorXd pAbs = VectorXd::Map(y.data(),   n);
     const VectorXd q    = VectorXd::Map(y.data()+n, n);
-    double u_ctrl = interpolateControl(t, uVec, input);
-    
+    double u_ctrl = 0.0;
+    if (!input.calculateSignal)
+        u_ctrl = interpolateControl(t, uVec, input);
+    // if (input.calculateSignal && abs(u_ctrl) > 1e-4)
+        // throw std::runtime_error("RHS_GLOBAL_ODE::operator(): u = " + std::to_string(u_ctrl) + ", control input must be 0.0 during identification");
+
     task::M Mass(input);
     const MatrixXd phi_q  = calc_phi_q(q, input);
     MatrixXd A = MatrixXd::Zero(3*Nbodies + Nconstr, 3*Nbodies + Nconstr);
@@ -682,7 +686,9 @@ void odeint_globalObserver::operator()( const state_type &y , double t )
 	const int Nconstr = input.calculateSignal ? input.Nconstr+1 : input.Nconstr;
 	state_type dy;
     global_obj(y, dy, t);
-    double u_ctrl = interpolateControl(t, uVec, input);
+    double u_ctrl = 0.0;
+    if (!input.calculateSignal)
+        u_ctrl = interpolateControl(t, uVec, input);
     VectorXd q  = VectorXd::Map(y.data()+n,  n);
     VectorXd dq = VectorXd::Map(dy.data()+n, n);
 

@@ -65,7 +65,7 @@ VectorXd Adjoint::__RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq,
 
     return (h->q(q, dq) - h->ddtdq(q, dq, d2q)) - 
         (M->ddqdq(q, dq, eta) - M->ddt(q, dq, eta) - F->dq(q, dq, u, eta)) -
-        (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi));
+        (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi)); //tutaj (F->q(...))
 }
 
 VectorXd Adjoint::__RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,

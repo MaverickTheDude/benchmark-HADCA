@@ -255,7 +255,7 @@ VectorXd RHS_ADJOINT_GLOBAL(const double& tau, const VectorXd& y, const VectorXd
 	A.block(0, n, n, Nconstr) = derivatives.Phi->q(stateAbs.q).transpose();
 	A.block(n, 0, Nconstr, n) = derivatives.Phi->q(stateAbs.q);
 	VectorXd RHS = VectorXd::Zero(n + Nconstr);
-	RHS.head(n) = derivatives.RHS(stateAbs.q, stateAbs.dq, stateAbs.d2q, stateAbs.lambda, (VectorXd(1) << u).finished(), eta, ksi);
+	RHS.head(n) = derivatives.RHS(stateAbs.q, stateAbs.dq, stateAbs.d2q, stateAbs.lambda, (VectorXd(1) << u).finished(), eta, ksi); // (tutaj)
 	RHS.tail(Nconstr) = 2 * derivatives.Phi->ddtq(stateAbs.q, stateAbs.dq) * eta +
                 			derivatives.Phi->d2dt2q(stateAbs.q, stateAbs.dq, stateAbs.d2q) * ksi;
 	VectorXd adjointAbs = A.partialPivLu().solve(RHS);

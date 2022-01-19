@@ -28,16 +28,20 @@ dep1 = cc.find_library('m')
 dep2 = cc.find_library('nlopt', dirs : '/usr/local/lib/')
 libgomp = cc.find_library('gomp')
 openmp = dependency('openmp')
-# export BOOST_ROOT=/usr/local/boost_1_77_0/ (or if you know how to simply add God damn folders to -I ...)
-# export BOOST_INCLUDEDIR=/usr/local/boost_1_77_0/
-boost_dep = dependency('boost')
 
-executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp, boost_dep],
-            cpp_args : '-fopenmp')#, link_args : '-fopenmp' )
+# https://mesonbuild.com/Include-directories.html#include-directories
+incdir = include_directories('/usr/local/boost_1_78_0/')
+# export BOOST_ROOT=/usr/local/boost_1_77_0/
+# export BOOST_INCLUDEDIR=/usr/local/boost_1_77_0/
+# boost_dep = dependency('boost')
+
+executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp],# boost_dep],
+            cpp_args : '-fopenmp', include_directories : incdir)#, link_args : '-fopenmp' )
 
 # tests:
-# e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : [openmp, boost_dep])
-# test('unitTest', e)
+#e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp],# boost_dep],
+#            cpp_args : '-fopenmp', include_directories : incdir)#, link_args : '-fopenmp' )
+#test('unitTest', e)
 
 # timings:
 #executable('timing', 'timing.cpp', dependencies : libgomp)

@@ -47,8 +47,8 @@ int main(int argc, char* argv[]) {
 # endif 
 
     /* SETTINGS */
-    double inputSignal = 0.0;
-    double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0001;
+    double inputSignal = 0.0; // note: dla zadania FwdGlobal:findSignal ta wartosc jest zawsze rowna 0.0
+    double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0000;
     double lb = -HUGE_VAL, ub = HUGE_VAL;
 
     /* initialize */
@@ -69,18 +69,18 @@ int main(int argc, char* argv[]) {
 #define OPT false
 #if !OPT // check adjoint equations or initial setup
 	{
-		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
+		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();
         print_checkGrad(solutionFwd, solution, u_zero, *input);
 	}
-	// _solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
-	// solutionG.print();
+	_solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
+	solutionG.print();
 #endif
 
 #if OPT // optimize
     nlopt::opt opt(nlopt::LD_MMA, input->Nsamples); // LD_SLSQP  LD_MMA  LD_CCSAQ  AUGLAG  G_MLSL_LDS (useless: GN_DIRECT_L, GN_ISRES)
     opt.set_xtol_rel(1e-4);
-    opt.set_maxeval(40);
+    opt.set_maxeval(30);
     
     /* opt. globalna + lokalna G_MLSL_LDS */
 /*     nlopt::opt opt_aux(nlopt::LD_MMA, input->Nsamples);
@@ -109,9 +109,9 @@ int main(int argc, char* argv[]) {
 
         /* post processing */
         u = VectorXd::Map(signal.data(), input->Nsamples);
-        _solution_ solutionFwd = RK_solver(u, *input);
-        solutionFwd.print(u);
-        solutionFwd.show_xStatus(u, *input);
+        _solution_ solution = RK_solver(u, *input);
+        solution.print(u, solutionFwd.alpha.row(0));
+        solution.show_xStatus(u, *input);
     }
     catch(std::exception &e) {
         std::cout << "nlopt failed: " << e.what() << std::endl;
