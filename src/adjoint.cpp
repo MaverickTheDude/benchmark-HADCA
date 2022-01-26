@@ -65,7 +65,7 @@ VectorXd Adjoint::__RHS(const _input_ &i, const VectorXd& q, const VectorXd& dq,
 
     return (h->q(q, dq) - h->ddtdq(q, dq, d2q)) - 
         (M->ddqdq(q, dq, eta) - M->ddt(q, dq, eta) - F->dq(q, dq, u, eta)) -
-        (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi)); //tutaj (F->q(...))
+        (F->q(q, dq, u, ksi) - F->ddtdq(q, dq, u, ksi) - Phi->ddqddqlambda(q, lambda, ksi));
 }
 
 VectorXd Adjoint::__RHS(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
@@ -79,8 +79,8 @@ VectorXd Adjoint::__RHS(const int bodyNumber, const _input_ &i, const VectorXd& 
      */
     return (h->q(bodyNumber, q, dq) - h->ddtdq(bodyNumber, q, dq, d2q)) - 
         (M->ddqdq(bodyNumber, q, dq) - M->ddt(bodyNumber, q, dq)) * eta.segment(3 * bodyNumber, 3) + F->dq(bodyNumber, q, dq, u, eta) -
-        ((F->q(bodyNumber, q, dq, u) - F->ddtdq(bodyNumber, q, dq, u)) * ksi) - 
-        Phi->ddqddqlambda(bodyNumber, q, lambda, ksi);
+        ((F->q(bodyNumber, q, dq, u) - F->ddtdq(bodyNumber, q, dq, u)) * ksi - 
+        Phi->ddqddqlambda(bodyNumber, q, lambda, ksi));
 }
 
 VectorXd Adjoint::__RHS3d(const int bodyNumber, const _input_ &i, const VectorXd& q, const VectorXd& dq, const VectorXd& d2q,
@@ -94,6 +94,6 @@ VectorXd Adjoint::__RHS3d(const int bodyNumber, const _input_ &i, const VectorXd
      */
     return (h->q(bodyNumber, q, dq) - h->ddtdq(bodyNumber, q, dq, d2q)) - 
         (M->ddqdq(bodyNumber, q, dq) - M->ddt(bodyNumber, q, dq)) * eta.segment(3 * bodyNumber, 3) + F->dq(bodyNumber, q, dq, u, eta) -
-        (F->q(bodyNumber, q, dq, u, ksi.segment(3 * bodyNumber, 3)) - F->ddtdq(bodyNumber, q, dq, u, ksi.segment(3 * bodyNumber, 3))) - 
-        Phi->ddqddqlambda3d(bodyNumber, q, lambda, ksi.segment(3 * bodyNumber, 3));
+        (F->q(bodyNumber, q, dq, u, ksi.segment(3 * bodyNumber, 3)) - F->ddtdq(bodyNumber, q, dq, u, ksi.segment(3 * bodyNumber, 3)) - 
+        Phi->ddqddqlambda3d(bodyNumber, q, lambda, ksi.segment(3 * bodyNumber, 3)));
 }

@@ -42,7 +42,7 @@ MatrixXd F_1::q(const VectorXd &q, const VectorXd &dq, const VectorXd &u) const
 
     for(int i = 0; i < input.Nbodies; i++)
         F_1_q.block(3 * i + 2, 3 * i, 1, 3) = (dSABdAlpha(input.pickBodyType(i).s1C,
-            absoluteAlpha(i)) * g).transpose();
+            absoluteAlpha(i)) * M::local(i, input) * g).transpose();
 
     return F_1_q;
 }
