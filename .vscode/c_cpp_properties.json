@@ -4,7 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/local/boost_1_78_0/"
+                "/usr/include/boost/"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

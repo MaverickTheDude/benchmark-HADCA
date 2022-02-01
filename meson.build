@@ -1,6 +1,5 @@
-# compile main project
-# https://mesonbuild.com/Build-options.html#visual-studio
-project('example', 'cpp', default_options: ['backend_startup_project=main'])
+project('example', 'cpp')
+
 sourcelist = ['src/assembly.cpp',
     'src/body.cpp',
     'src/input.cpp',
@@ -17,36 +16,40 @@ sourcelist = ['src/assembly.cpp',
     'src/RHSA.cpp',
     'src/RHS-odeint.cpp']
 
-# Add openmp support. Note: tdhis can be done with a single dependency, but we keep verbose version to show more syntax
-# https://mesonbuild.com/Adding-arguments.html
-# https://stackoverflow.com/questions/45465892/how-to-use-openmp-in-a-c-project-built-with-meson
-add_project_arguments('-fopenmp', language : 'cpp')
-
-# https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 cc = meson.get_compiler('cpp')
 dep1 = cc.find_library('m')
 dep2 = cc.find_library('nlopt', dirs : '/usr/local/lib/')
 libgomp = cc.find_library('gomp')
+
 openmp = dependency('openmp')
-# export BOOST_ROOT=/usr/local/boost_1_77_0/ (or if you know how to simply add God damn folders to -I ...)
-# export BOOST_INCLUDEDIR=/usr/local/boost_1_77_0/
 boost_dep = dependency('boost')
 
 executable('main', 'main.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp, boost_dep],
-            cpp_args : '-fopenmp')#, link_args : '-fopenmp' )
+            cpp_args : '-fopenmp')
 
-# tests:
-# e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : [openmp, boost_dep])
-# test('unitTest', e)
+# Tests:
+# acutests = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : [libgomp, boost_dep])
+# test('unitTest', acutests)
 
-# timings:
-#executable('timing', 'timing.cpp', dependencies : libgomp)
+# Timings:
+# executable('timing', 'timing.cpp', dependencies : libgomp)
 
-# utilsTest (time of execution)
+# Utils test (time of execution)
 # executable('utilsTest', 'misc/utilsTests.cpp', sources : sourcelist, dependencies : libgomp)
 
 # Jacobi matrices building performance test
-#executable('jacobiBuildPerf', 'misc/jacobiBuildPerf.cpp', sources: sourcelist)
+# executable('jacobiBuildPerf', 'misc/jacobiBuildPerf.cpp', sources : sourcelist,  dependencies : libgomp)
+
+# Legacy
+
+# compile main project
+# https://mesonbuild.com/Build-options.html#visual-studio
+
+# Add openmp support. Note: tdhis can be done with a single dependency, but we keep verbose version to show more syntax
+# https://mesonbuild.com/Adding-arguments.html
+# https://stackoverflow.com/questions/45465892/how-to-use-openmp-in-a-c-project-built-with-meson
+
+# https://mesonbuild.com/howtox.html#add-math-library-lm-portably
 
 # === NLOPT setup: ===
 # In case the executable file cannot open shared object file libnlopt.so.* - try manual linking
