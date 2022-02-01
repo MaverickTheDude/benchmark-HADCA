@@ -16,7 +16,7 @@ meson compile
 
 This piece of work was created before diving into *Docker best practices*, excuse me.
 
-## I have **not** Docker in my WSL 2 (Ubuntu specific)
+## I have **not** Docker in my WSL 2
 
 Please follow this [excellent blog post](https://dev.to/bowmanjd/install-docker-on-windows-wsl-without-docker-desktop-34m9) by Jonathan Bowman to fully understand what is going under the hood. I've copied necessary steps at the bottom of the page.
 
@@ -78,7 +78,7 @@ To run the release container
 - [Docker multistage build](https://docs.docker.com/develop/develop-images/multistage-build/)
 - [Remote - Containers project configuration](https://code.visualstudio.com/docs/remote/devcontainerjson-reference)
 
-## Docker short installation guide
+## Docker short installation guide  (Ubuntu specific)
 1. Install dependencies `sudo apt install --no-install-recommends apt-transport-https ca-certificates curl gnupg2`.
 2. Set some OS-specific variables `source /etc/os-release`.
 3. Make sure `apt` will trust the repo `curl -fsSL https://download.docker.com/linux/${ID}/gpg | sudo apt-key add -`.
