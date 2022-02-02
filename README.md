@@ -44,7 +44,7 @@ This stage is primarly designed to develop in VS Code with [Remote Containers (G
 
 You can build the building container image as follows
 ```
-    docker build --target build -t examplecp/build -f ./.devcontainer/Dockerfile .
+    docker build --target build -t examplecp/build .
 ```
 
 To run the building container (with binaries already compiled according to meson.build) run the container
@@ -55,7 +55,7 @@ To run the building container (with binaries already compiled according to meson
 ### Release stage (*release*)
 
 ```
-    docker build --target release -t examplecp/release -f ./.devcontainer/Dockerfile .
+    docker build --target release -t examplecp/release .
 ```
 
 To run the release container
