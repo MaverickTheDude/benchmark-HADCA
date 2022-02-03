@@ -64,9 +64,18 @@ To run the release container
 ```
 
 ## Useful basic Docker commands
+
+### General
+
 - `docker images -a`
 - `docker ps -a`
 - `docker rmi $(docker images -a -q)`
+
+### Upload Docker image to GitLab Container Registry
+- `docker login registry.example.com -u <username> -p <token>`
+- `docker build --target build -t registry.gitlab.com/pawel-maciag/examplecp/build .`
+- `docker push registry.gitlab.com/pawel-maciag/examplecp/build`
+
 
 ## Useful links
 - [Visual Studio Code - Containers in WSL](https://code.visualstudio.com/blogs/2020/07/01/containers-wsl)
