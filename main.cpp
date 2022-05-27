@@ -6,8 +6,8 @@
 #include "Eigen/Dense"
 #include <iostream>
 #include <time.h>
-#include <math.h>
-#include <nlopt.hpp>
+// #include <math.h>
+// #include <nlopt.hpp>
 #include <iomanip>
 #include <Eigen/StdVector> // zamiast <vector> (to chyba to samo z dodatkowym paddingiem dla pamieci?)
 #include <omp.h>
@@ -27,7 +27,7 @@
 using namespace Eigen;
 using std::cout;
 using std::endl;
-static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data);
+// static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data);
 
 int main(int argc, char* argv[]) {
     int Nbodies = 4, Nthreads = 4;
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     /* SETTINGS */
     double inputSignal = 0.0; // note: dla zadania FwdGlobal:findSignal ta wartosc jest zawsze rowna 0.0
     double w_hq = 1, w_hdq = 0.0; double w_hsig = 0.0000;
-    double lb = -HUGE_VAL, ub = HUGE_VAL;
+    // double lb = -HUGE_VAL, ub = HUGE_VAL;
 
     /* initialize */
     _input_* input = new _input_(Nbodies);
@@ -58,23 +58,23 @@ int main(int argc, char* argv[]) {
     // u_zero = (-1.0) * VectorXd::Map(solutionFwdG.get_signal().data(), input->Nsamples);
 
     _solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
-    solutionFwd.show_xStatus(u_zero, *input);
+    // solutionFwd.show_xStatus(u_zero, *input);
 
     input->w_hq   = w_hq;
     input->w_hdq  = w_hdq;
     input->w_hsig = w_hsig;
 
-    solutionFwd.print();
+    // solutionFwd.print();
     // solutionFwdG.print();
 #define OPT false
 #if !OPT // check adjoint equations or initial setup
 	{
-		_solutionAdj_ solution = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
+		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
 		solution.print();
         print_checkGrad(solutionFwd, solution, u_zero, *input);
 	}
-	_solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
-	solutionG.print();
+	// _solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
+	// solutionG.print();
 #endif
 
 #if OPT // optimize
@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
-
+#if OPT
 static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data)
 {
     _input_* input = static_cast<_input_*>(my_func_data);
@@ -151,3 +151,4 @@ static double costFunction(unsigned int n, const double *x, double *grad, void *
     cout << "fun evaluation #" << cnt++ << ", value: " << f << endl;
     return f;
 }
+#endif

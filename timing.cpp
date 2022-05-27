@@ -1,11 +1,14 @@
 #include <iostream>
 #include <iomanip> // std::setprecision
 #include <string>
+#include <vector>
 #include <stdlib.h>
 #include <time.h>
 #include <fstream>
 #include <omp.h>
+#include <chrono>
 
+using namespace std::literals::chrono_literals;
 using std::cout;
 using std::endl;
 const std::string getJobId(int, int);
@@ -14,9 +17,11 @@ times timeTask(int, int, int);
 
 
 int main() {
-	int threads[] = {1, 2, 4, 8};	int Nth = 4;
-	int bodies[]  = {256, 512, 1024, 2048};	int Nbodies = 4;
-	int mean = 4;
+	const std::vector<int> threads {1, 2, 4, 8};
+	const std::vector<int> bodies  {32, 64, 128, 256};
+	const int Nth = threads.size();
+	const int Nbodies = bodies.size();
+	int mean = 3;
 
 	std::ofstream outFile;
 	outFile.open("../output/times.txt");
@@ -32,8 +37,8 @@ int main() {
 		outFile << threads[i] << " | \t";
 		for (int j = 0; j < Nbodies; j++) {
 			times T = timeTask(threads[i], bodies[j], mean);
-			outFile << std::fixed << std::setprecision(6) << T.t << " / " 
-								  << std::setprecision(6) << T.wt << "\t\t";
+			outFile << std::fixed /* << std::setprecision(6) << T.t << " / "  */
+								  << std::setprecision(6) << T.wt << "\t";
 		}
 		outFile << endl;
 	}
@@ -53,12 +58,16 @@ times timeTask(int threads, int bodies, int mean) {
 
 	for (int i = 0; i < mean; i++) {
 		start = clock();
+// auto start = std::chrono::high_resolution_clock::now();
 		wt1 = omp_get_wtime();
 		system(job.c_str());
 		wt2 = omp_get_wtime();
 		end = clock();
-		tab[i] = double(end - start) / double(CLOCKS_PER_SEC);
 		wtab[i] = wt2 - wt1;
+		tab[i] = double(end - start) / double(CLOCKS_PER_SEC);
+// auto end = std::chrono::high_resolution_clock::now();
+// std::chrono::duration<double> duration = end - start;
+// tab[i] = duration.count();
 	}
 
 	cout << "czasy dla zadania: Nthreads = " << threads << " Nbodies = " << bodies << '\n';

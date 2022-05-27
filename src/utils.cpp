@@ -13,7 +13,7 @@
 
 using namespace Eigen;
 
-#define PARALLEL_UTILS false
+#define PARALLEL_UTILS true
 
 #if PARALLEL_UTILS
 
@@ -47,7 +47,7 @@ VectorXd joint2AbsAngles(const VectorXd &alpha)
 	for (int i=1; i < Nthr; i++)
 		sumThr(i) += sumThr(i - 1);
 
-	// Apply offsets and compute cumsums for (r)
+	// Apply offsets and compute cumsums
 #pragma omp parallel for schedule(static, chunk)
 	for (int i = 1; i < Nbodies; i++)
         alphaAbs(i) += sumThr(omp_get_thread_num());
@@ -582,7 +582,7 @@ dataJoint interpolate(const double& t, const _solution_& solutionFwd, const _inp
     else if (baseInd == input.Nsamples-2)   // pre-last node
         baseInd--;
     else if (baseInd == input.Nsamples-1) { // last node
-        const int last = Nvars-1;
+        const int last = input.Nsamples-1;
         dataInterp.alpha   = solutionFwd.alpha.col(last);
         dataInterp.dalpha  = solutionFwd.dalpha.col(last);
         dataInterp.d2alpha = solutionFwd.d2alpha.col(last);
@@ -641,14 +641,23 @@ dataJoint interpolateLinear(const double& t, const _solution_& solutionFwd, cons
     const int& baseInd = indStruct.first;
 	dataJoint dataInterp = dataJoint(Nvars);
 
-    dataJoint s00 = solutionFwd.getDynamicValues(baseInd  , input);
-    dataJoint sf1 = solutionFwd.getDynamicValues(baseInd+1, input);
+    if (baseInd == input.Nsamples-1) { // last node
+        const int last = input.Nsamples-1;
+        dataInterp.alpha   = solutionFwd.alpha.col(last);
+        dataInterp.dalpha  = solutionFwd.dalpha.col(last);
+        dataInterp.d2alpha = solutionFwd.d2alpha.col(last);
+        dataInterp.lambda  = solutionFwd.lambda.col(last);
+    }
+    else
+    {
+        dataJoint s00 = solutionFwd.getDynamicValues(baseInd  , input);
+        dataJoint sf1 = solutionFwd.getDynamicValues(baseInd+1, input);
 
-    dataInterp.alpha   = (s00.alpha   + sf1.alpha)   / 2.0;
-    dataInterp.dalpha  = (s00.dalpha  + sf1.dalpha)  / 2.0;
-    dataInterp.d2alpha = (s00.d2alpha + sf1.d2alpha) / 2.0;
-    dataInterp.lambda  = (s00.lambda  + sf1.lambda)  / 2.0;
-
+        dataInterp.alpha   = (s00.alpha   + sf1.alpha)   / 2.0;
+        dataInterp.dalpha  = (s00.dalpha  + sf1.dalpha)  / 2.0;
+        dataInterp.d2alpha = (s00.d2alpha + sf1.d2alpha) / 2.0;
+        dataInterp.lambda  = (s00.lambda  + sf1.lambda)  / 2.0;
+    }
     return dataInterp;
 }
 

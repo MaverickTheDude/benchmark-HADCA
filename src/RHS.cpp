@@ -215,6 +215,7 @@ VectorXd RHS_HDCA(const double& t, const VectorXd& y, const VectorXd& uVec, cons
         sum += (dSc2 + dS1c) * P1art.col(i+1);
 		des.col(i) = sum;
     } 
+*/
 
     /* joint dp from the articulated quantities */
 #pragma omp parallel for schedule(static)

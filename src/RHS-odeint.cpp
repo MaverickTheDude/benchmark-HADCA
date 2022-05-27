@@ -468,7 +468,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 			upperBranch.back().setArtForces(branch.back());
 	}
 
-
+#if true
 //--- descendants term calculation (reverse cummulative sum) -------
 	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
     Vector3d sum = Vector3d::Zero();
@@ -476,7 +476,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     const int preLastBody = input.Nbodies-2;
 
 	// Oblicz cumsum w podprzedzialach i zapisz ostatnia (najwieksza) wartosc w tablicy sumThr
-# pragma omp parallel for schedule(static) private(sum)
+# pragma omp parallel for schedule(static) firstprivate(sum)
 	for (int i = preLastBody; i >= 0; i--) {
         const Matrix3d& dSc2_A = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
         const Matrix3d& dS1c_B =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
@@ -492,7 +492,19 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 	// Zastosuj poprawke
 # pragma omp parallel for schedule(static)
 	for (int i = preLastBody; i >= 0; i--)
-		des.col(i) += sumThr.col(omp_get_thread_num());
+		des.col(i) += sumThr.col(omp_get_thread_num()); 
+#else
+    //--- descendants term calculation -------
+	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+    Vector3d sum = Vector3d::Zero();
+    const int preLastBody = input.Nbodies-2;
+    for (int i = preLastBody; i >= 0; i--) {
+        const Matrix3d dSc2 = (-1.0) * dSAB("s2C", i,   alphaAbs, dAlphaAbs, input);
+        const Matrix3d dS1c =          dSAB("s1C", i+1, alphaAbs, dAlphaAbs, input);
+        sum += (dSc2 + dS1c) * P1art.col(i+1);
+		des.col(i) = sum;
+    }
+#endif
 
     /* joint dp from the articulated quantities */
 #pragma omp parallel for schedule(static)
