@@ -8,6 +8,9 @@
 using namespace Eigen;
 using aaA = aligned_allocator<Assembly>;
 
+struct taskTimes {double wt=0.0, wt_adj=0.0, t=0.0, t_adj=0.0;
+    void update(const taskTimes&); void divide(const int mean);};
+
 // utils.cpp
 Matrix2d Rot(double fi);
 MatrixXd jacobianReal(VectorXd (*fun)(const VectorXd&, const _input_&), VectorXd alfa0, const _input_& input);

@@ -810,3 +810,12 @@ std::vector<double> read_vector_from_file(std::string filename)
 
     return newVector;
 }
+
+void taskTimes::update(const taskTimes& times) {
+    t  += times.t;  t_adj  += times.t_adj;
+    wt += times.wt; wt_adj += times.wt_adj;
+}
+void taskTimes::divide(const int mean) {
+    t  /= mean;  t_adj  /= mean;
+    wt /= mean;  wt_adj /= mean;
+}

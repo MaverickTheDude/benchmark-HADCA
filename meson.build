@@ -37,8 +37,8 @@ incdir = include_directories('/usr/local/boost_1_78_0/')
 # export BOOST_INCLUDEDIR=/usr/local/boost_1_77_0/
 # boost_dep = dependency('boost')
 
-executable('main', 'main.cpp', sources : sourcelist, dependencies : deps,
-            cpp_args : '-fopenmp', include_directories : incdir)
+# executable('main', 'main.cpp', sources : sourcelist, dependencies : deps,
+#             cpp_args : '-fopenmp', include_directories : incdir)
 
 # tests:
 #e = executable('tests', 'tests.cpp', sources : sourcelist, dependencies : [dep1, dep2, libgomp],# boost_dep],
@@ -46,7 +46,10 @@ executable('main', 'main.cpp', sources : sourcelist, dependencies : deps,
 #test('unitTest', e)
 
 # timings:
-executable('timing', 'timing.cpp', dependencies : libgomp)
+# executable('timing', 'timing.cpp', dependencies : libgomp)
+
+executable('main', 'timing.cpp', sources : [sourcelist, 'main.cpp'], dependencies : deps,
+            cpp_args : '-fopenmp', include_directories : incdir)
 
 # utilsTest (time of execution)
 # executable('utilsTest', 'misc/utilsTests.cpp', sources : sourcelist, dependencies : libgomp)

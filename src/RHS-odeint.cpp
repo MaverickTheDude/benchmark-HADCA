@@ -15,7 +15,7 @@
 using std::vector;
 using namespace boost::numeric;
 
-#define SHOW_PROGRESS true
+#define SHOW_PROGRESS false
 
 _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
 	const double dt = input.dt;

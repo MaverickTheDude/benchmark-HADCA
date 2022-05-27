@@ -7,11 +7,11 @@ using namespace Eigen;
 
 #include <iostream>
 
-#define SIMULATION_TIME 2
+#define SIMULATION_TIME 1
 #define TIME_STEP 0.01
 #define LOG_ENERGY false
-#define LOG_CONSTR true
-#define CALCULATE_SIGNAL true // (dotyczy tylko sformulowania globalnego)
+#define LOG_CONSTR false
+#define CALCULATE_SIGNAL false // (dotyczy tylko sformulowania globalnego)
 
 _input_::_input_(int _Nbodies_) : Nbodies(_Nbodies_), alpha0(Nbodies),
                                   dalpha0(Nbodies),   pjoint0(Nbodies),

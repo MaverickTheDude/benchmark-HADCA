@@ -29,7 +29,8 @@ using std::cout;
 using std::endl;
 // static double costFunction(unsigned int n, const double *x, double *grad, void *my_func_data);
 
-int main(int argc, char* argv[]) {
+// int main(int argc, char* argv[]) {
+taskTimes __main__(int argc, const char* argv[]) {
     int Nbodies = 4, Nthreads = 4;
     if (argc > 1) {
         Nthreads = atoi(argv[1]);
@@ -39,8 +40,8 @@ int main(int argc, char* argv[]) {
     omp_set_num_threads(Nthreads);
 #pragma omp parallel
 {
-    if (omp_get_thread_num() == 0)
-        cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads with " << Nbodies << " bodies." << endl;
+    // if (omp_get_thread_num() == 0)
+        // cout << "OpenMP test executed in parallel on " << omp_get_num_threads() << " threads with " << Nbodies << " bodies." << endl;
 }
 # else
     cout << "Caution: Your sourcecode was compiled without switching OpenMP on" << endl;
@@ -57,7 +58,20 @@ int main(int argc, char* argv[]) {
     // _solutionGlobal_ solutionFwdG = RK_GlobalSolver_odeInt(u_zero, *input);
     // u_zero = (-1.0) * VectorXd::Map(solutionFwdG.get_signal().data(), input->Nsamples);
 
-    _solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
+    // task timing commands
+	clock_t start, end;
+    double wtimeAdj, cpuTimeAdj;
+	double wt1, wtime, cpuTime;
+    start = clock();
+// auto start = std::chrono::high_resolution_clock::now();
+    wt1   = omp_get_wtime();
+_solution_ solutionFwd = RK_solver_odeInt(u_zero, *input);
+    wtime = omp_get_wtime() - wt1;
+    end   = clock();
+    cpuTime = double(end - start) / double(CLOCKS_PER_SEC);
+// auto end = std::chrono::high_resolution_clock::now();
+// std::chrono::duration<double> duration = end - start;
+// cpuTime = duration.count();
     // solutionFwd.show_xStatus(u_zero, *input);
 
     input->w_hq   = w_hq;
@@ -69,13 +83,21 @@ int main(int argc, char* argv[]) {
 #define OPT false
 #if !OPT // check adjoint equations or initial setup
 	{
-		_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
+        start = clock();
+        wt1   = omp_get_wtime();
+_solutionAdj_ solution = RK_AdjointSolver_odeInt(u_zero, solutionFwd, *input, _solutionAdj_::HDCA);
+        wtimeAdj = omp_get_wtime() - wt1;
+        end   = clock();
+        cpuTimeAdj = double(end - start) / double(CLOCKS_PER_SEC);
+
 		solution.print();
         print_checkGrad(solutionFwd, solution, u_zero, *input);
 	}
 	// _solutionAdj_ solutionG = RK_AdjointSolver(u_zero, solutionFwd, *input, _solutionAdj_::GLOBAL);
 	// solutionG.print();
 #endif
+
+taskTimes times {wtime, wtimeAdj, cpuTime, cpuTimeAdj};
 
 #if OPT // optimize
     nlopt::opt opt(nlopt::LD_MMA, input->Nsamples); // LD_SLSQP  LD_MMA  LD_CCSAQ  AUGLAG  G_MLSL_LDS (useless: GN_DIRECT_L, GN_ISRES)
@@ -120,7 +142,7 @@ int main(int argc, char* argv[]) {
 
     delete input;
 	// cout << "done\n";
-	return 0;
+	return times;
 }
 
 #if OPT

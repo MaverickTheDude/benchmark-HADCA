@@ -6,14 +6,17 @@
 #include <time.h>
 #include <fstream>
 #include <omp.h>
-#include <chrono>
+// #include <chrono>
+// using namespace std::literals::chrono_literals;
+#include "include/utils.h"
+extern taskTimes __main__(int argc, const char* argv[]);
 
-using namespace std::literals::chrono_literals;
 using std::cout;
 using std::endl;
 const std::string getJobId(int, int);
 struct times {double t, wt;};
 times timeTask(int, int, int);
+taskTimes timeMainFunction(int, int, int);
 
 
 int main() {
@@ -23,28 +26,57 @@ int main() {
 	const int Nbodies = bodies.size();
 	int mean = 3;
 
-	std::ofstream outFile;
+	std::ofstream outFile, outFileCPU;
 	outFile.open("../output/times.txt");
-	if (outFile.fail() ) {
+	outFileCPU.open("../output/timesCPU.txt");
+	if (outFile.fail() || outFileCPU.fail()) {
 		std::cerr << "nie udalo sie otworzyc pliku.";
 		throw std::runtime_error("timing.cpp: nie udalo sie otworzyc pliku");
 	}
 	outFile << "Bodies:";
 	for (int i = 0; i < Nbodies; i++) outFile << "\t\t" << bodies[i];
-	outFile << "\nthreads -------------------------------------- (mean = " << mean << ")\n";
+	outFile << "\nthreads -------------------------------------- (Wall, mean = " << mean << ")\n";
+	outFileCPU << "Bodies:";
+	for (int i = 0; i < Nbodies; i++) outFileCPU << "\t\t" << bodies[i];
+	outFileCPU << "\nthreads -------------------------------------- (CPU, mean = " << mean << ")\n";
 
 	for (int i = 0; i < Nth; i++) {
 		outFile << threads[i] << " | \t";
+		outFileCPU << threads[i] << " | \t";
 		for (int j = 0; j < Nbodies; j++) {
-			times T = timeTask(threads[i], bodies[j], mean);
-			outFile << std::fixed /* << std::setprecision(6) << T.t << " / "  */
-								  << std::setprecision(6) << T.wt << "\t";
+			taskTimes T = timeMainFunction(threads[i], bodies[j], mean);
+			// outFile << std::fixed /* << std::setprecision(6) << T.t << " / "  */
+			// 					  << std::setprecision(6) << T.wt << "\t";
+			outFile    << std::fixed << std::setprecision(6) << T.wt << " / " << T.wt_adj << "  \t";
+			outFileCPU << std::fixed << std::setprecision(6) << T.t  << " / " << T.t_adj  << "  \t";
 		}
 		outFile << endl;
+		outFileCPU << endl;
 	}
 
 	outFile.close();
 	return 0;
+}
+
+taskTimes timeMainFunction(int threads, int bodies, int mean) {
+	std::string s = std::to_string(threads);
+	char const *threads_char = s.c_str();
+	std::string s2 = std::to_string(bodies);
+	char const *bodies_char = s2.c_str();
+	cout << "czasy dla zadania: Nthreads = " << threads << " Nbodies = " << bodies << '\n';
+	cout << "Wall FWD\t Wall ADJ\t CPU FWD\t CPU ADJ\n";
+
+	taskTimes times;
+	for (int i = 0; i < mean; i++) {
+		const char* args[3] = {"", threads_char, bodies_char};
+
+		taskTimes timesTmp = __main__(3, args);
+		times.update(timesTmp);
+		cout << std::fixed << std::setprecision(6) << timesTmp.wt << '\t'
+			 << timesTmp.wt_adj << '\t' << timesTmp.t << "\t" << timesTmp.t_adj << std::endl;
+	}
+	times.divide(mean);
+	return times;
 }
 
 
