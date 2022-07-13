@@ -15,7 +15,8 @@ sourcelist = ['src/assembly.cpp',
     'src/adjoint.cpp',
     'src/solvers.cpp',
     'src/RHSA.cpp',
-    'src/RHS-odeint.cpp']
+    'src/RHS-odeint.cpp',
+    'src/timer.cpp']
 
 # Add openmp support. Note: tdhis can be done with a single dependency, but we keep verbose version to show more syntax
 # https://mesonbuild.com/Adding-arguments.html

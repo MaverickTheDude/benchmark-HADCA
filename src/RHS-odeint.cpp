@@ -6,6 +6,8 @@
 #include "../include/adjoint.h"
 #include "../include/task/Phi.h"
 #include "../include/odeint.h"
+#include "../include/timer.h"
+#include "../include/config.h"
 // #include <boost/numeric/odeint.hpp>
 #include <boost/numeric/odeint/stepper/controlled_runge_kutta.hpp>
 #include <boost/numeric/odeint/stepper/runge_kutta_cash_karp54.hpp>
@@ -15,7 +17,6 @@
 using std::vector;
 using namespace boost::numeric;
 
-#define SHOW_PROGRESS true
 
 _solution_ RK_solver_odeInt(const VectorXd& uVec, const _input_& input) {
 	const double dt = input.dt;
@@ -64,8 +65,13 @@ _solutionAdj_ RK_AdjointSolver_odeInt(const VectorXd& uVec, const _solution_& so
 	const int Nbodies = input.Nbodies;
     _solutionAdj_ solution(input);
 
-	VectorXd y0eigen = boundaryConditions(solutionFwd, input, formulation);
-
+	VectorXd y0eigen;
+{
+#if EX_PROFILE
+    procTimer T(Timer_Adj_bc);
+#endif
+    y0eigen = boundaryConditions(solutionFwd, input, formulation);
+}
     std::vector<double> y0(2*Nbodies);
     std::vector<double> T(input.Nsamples);
     std::generate(T.begin(), T.end(), [n = 0, &input]() mutable { return n++ * input.dt; });
@@ -126,10 +132,24 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
     const unsigned int n = y.size()/2;
     VectorXd e = VectorXd::Map(y.data(),   n);
     VectorXd c = VectorXd::Map(y.data()+n, n);
-    dataJoint state = interpolate(t, solutionFwd, input);
-    dataAbsolute stateAbs = dataAbsolute(e, c, state, input);
     VectorXd de(n);
+
+#if EX_PROFILE
+    procTimer Tinterp(Timer_Adj_Interp);
+#endif
+    dataJoint state = interpolate(t, solutionFwd, input);
     const double u = interpolateControl(t, uVec, input);
+#if EX_PROFILE
+    Tinterp.Stop();
+#endif
+
+#if EX_PROFILE
+    procTimer Tproj(Timer_Adj_Proj);
+#endif
+    dataAbsolute stateAbs = dataAbsolute(e, c, state, input);
+#if EX_PROFILE
+    Tproj.Stop();
+#endif
 
     using aaA = aligned_allocator<AssemblyAdj>;
     vector<vector<AssemblyAdj, aaA >, aaA > tree;
@@ -140,6 +160,10 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
     /* Initialize leaf bodies (baza indukcyjna) */
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
 	size_t *prefix;
+{
+#if EX_PROFILE
+    procTimer T(Timer_Adj_Leaves);
+#endif
 #pragma omp parallel
 {
     int ithread = 0, nthreads = 1;
@@ -168,7 +192,12 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
     std::copy(vec_private.begin(), vec_private.end(), dest_iter );
 }
     delete[] prefix;
+}
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Adj_Asm);
+#endif
     for (int i = 1; i < input.Ntiers; i++) {
         vector<AssemblyAdj, aaA >& branch = tree[i];
         vector<AssemblyAdj, aaA >& upperBranch = tree[i-1];
@@ -204,17 +233,22 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
         std::copy(vec_private.begin(), vec_private.end(), dest_iter );
 }
         delete[] prefix;
+
         
         /* case: odd # elements */
 		if (input.tiersInfo[i-1] % 2 == 1)
             branch.back() = upperBranch.back(); // note: shallow copy is exactly what we need
     }
-    
+}
     /* base body connection */
     AssemblyAdj& AssemblyS = tree[input.Ntiers-1][0];
 	AssemblyS.connect_base_body();
 	AssemblyS.disassemble();
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Adj_Disasm);
+#endif
     const int prelastTier = input.Ntiers-2;
 	for (int i = prelastTier; i > 0; i--) {
 		const int end_of_branch = input.tiersInfo[i-1] % 2 == 0 ?
@@ -230,8 +264,12 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
 			tree[i-1].back().setAll(tree[i].back());
 		}
 	}
+}
 
     /* joint space projection */
+#if EX_PROFILE
+    Tproj.Start();
+#endif
     MatrixXd P1art(3, input.Nbodies+1);
     const Vector3d Hground = input.pickBodyType(0).H;
 	de(0) = Hground.transpose() * leafBodies[0].calculate_dETA1();
@@ -244,8 +282,11 @@ void RHS_ADJ_ODE::operator() (const state_type &y, state_type &dy , const double
 		Vector3d dE1B = leafBodies[i].calculate_dETA1();
 		Vector3d dE2A = leafBodies[i-1].calculate_dETA2();
 		de(i) = H.transpose() * (dE1B - dE2A);
-        deta.segment(3*i, 3) = dE1B;
+        // deta.segment(3*i, 3) = dE1B; // unused
 	}
+#if EX_PROFILE
+    Tproj.Stop();
+#endif
 
     VectorXd dc = -e;
     dy.resize(2*input.Nbodies);
@@ -284,7 +325,7 @@ void odeint_observer_adj::operator()( const state_type &y , double tau )
         solution.setNorms(ind, norms);
     }
 
-#if SHOW_PROGRESS
+#if EX_SHOW_PROGRESS
     static int cnt = 0;
     double Tcnt = input.Tk / 10 * cnt;
     if (tau >= Tcnt) {
@@ -321,6 +362,10 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     /* Initialize leaf bodies (baza indukcyjna) */
     // https://eigen.tuxfamily.org/dox/group__TopicStlContainers.html --> The case of std::vector
     // https://stackoverflow.com/a/18671256/4283100
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Leaves);
+#endif
     size_t *prefix;
 #pragma omp parallel
 {
@@ -350,14 +395,20 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     std::copy(vec_private.begin(), vec_private.end(), dest_iter );
 }
     delete[] prefix;
+}
 
-
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Asm);
+#endif
     for (int i = 1; i < input.Ntiers; i++) {
         vector<Assembly, aaA >& branch = tree[i];
         vector<Assembly, aaA >& upperBranch = tree[i-1];
         branch.resize(input.tiersInfo[i]);
         const int endOfBranch = input.tiersInfo[i-1] - 1;
 
+    size_t *prefix;
+    /* core loop of HDCA (assembly) */
 #pragma omp parallel
 {
         int ithread = 0, nthreads = 1;
@@ -391,17 +442,23 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
     if (input.tiersInfo[i-1] % 2 == 1)
         branch.back() = upperBranch.back(); // note: shallow copy is exactly what we need
     }
+}
     
     /* base body connection */
     Assembly& AssemblyS = tree[input.Ntiers-1][0];
 	AssemblyS.connect_base_body();
 	AssemblyS.disassembleVel();
-
     const int prelastTier = input.Ntiers-2;
+
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Disasm);
+#endif
 	for (int i = prelastTier; i > 0; i--) {
 		const int end_of_branch = input.tiersInfo[i-1] % 2 == 0 ?
 				input.tiersInfo[i] : input.tiersInfo[i]-1;
 
+    /* core loop of HDCA (disassembly) */
 #pragma omp parallel for schedule(static)
         for (int j = 0; j < end_of_branch; j++)
             tree[i].at(j).disassembleVel();
@@ -411,6 +468,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 			tree[i-1].back().setVel(tree[i].back());
 		}
 	}
+}
 
     /* velocity calculation */
     const Vector3d Hground = input.pickBodyType(0).H;
@@ -418,6 +476,10 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 	this->P1art.col(0) = leafBodies[0].T1_() + Hground*pjoint(0);
     this->P1art.col(input.Nbodies).setZero();
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Proj);
+#endif
 #pragma omp parallel for schedule(static)
 	for (int i = 1; i < input.tiersInfo[0]; i++) {
         const Vector3d H = input.pickBodyType(i).H;
@@ -427,13 +489,23 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 		P1art.col(i) = leafBodies[i].T1_() + H*pjoint(i);
 	}
     this->dAlphaAbs = joint2AbsAngles(dalpha);
+}
 
     /* articulated forces calculation */
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Force_Leaves);
+#endif
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < input.tiersInfo[0]; i++) {
         leafBodies[i].setCoefArtForces(i, alphaAbs, dalpha, u_ctrl, input);
     }
+}
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Force_Asm);
+#endif
     for (int i = 1; i < input.Ntiers; i++) {                // assembly
         vector<Assembly, aaA >& branch = tree[i];
         vector<Assembly, aaA >& upperBranch = tree[i-1];
@@ -449,11 +521,16 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
         if (Nparents % 2 == 1)
 			branch.back().setAccForces(upperBranch.back());
     }
+}
 
     /* base body connection */
     AssemblyS.connect_base_artForces();
     AssemblyS.disassembleForce();
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Force_Disasm);
+#endif
     for (int i = prelastTier; i > 0; i--) {                     // disassembly
         vector<Assembly, aaA >& branch = tree[i];
         vector<Assembly, aaA >& upperBranch = tree[i-1];
@@ -467,10 +544,16 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 		if (input.tiersInfo[i-1] % 2 == 1)
 			upperBranch.back().setArtForces(branch.back());
 	}
+}
 
-#if true
-//--- descendants term calculation (reverse cummulative sum) -------
-	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+    //--- descendants term calculation -------
+    MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Cumsum);
+#endif
+#if EX_PARALLEL_UTILS
+//--- reverse cummulative sum -------
     Vector3d sum = Vector3d::Zero();
 	MatrixXd sumThr = MatrixXd::Zero(3, omp_get_max_threads()+1);
     const int preLastBody = input.Nbodies-2;
@@ -494,8 +577,7 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 	for (int i = preLastBody; i >= 0; i--)
 		des.col(i) += sumThr.col(omp_get_thread_num()); 
 #else
-    //--- descendants term calculation -------
-	MatrixXd des = MatrixXd::Zero(3, input.Nbodies);
+    /* --- straight approach ------- */
     Vector3d sum = Vector3d::Zero();
     const int preLastBody = input.Nbodies-2;
     for (int i = preLastBody; i >= 0; i--) {
@@ -505,14 +587,20 @@ void RHS_HDCA_ODE::operator() (const state_type &y, state_type &dy , const doubl
 		des.col(i) = sum;
     }
 #endif
+}
 
     /* joint dp from the articulated quantities */
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Proj);
+#endif
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < input.Nbodies; i++) {
         const Vector3d H = input.pickBodyType(i).H;
         const Matrix3d dS1c = dSAB("s1C", i, alphaAbs, dAlphaAbs, input);
 		dpjoint(i) = H.transpose() * (des.col(i) + leafBodies[i].Q1Art_() + dS1c*P1art.col(i) );
 	}
+}
 
     dy.resize(2*input.Nbodies);
     auto dest_iter = std::next(dy.begin(), n);
@@ -554,11 +642,19 @@ void odeint_observer::operator()( const state_type &y , double t )
 
     /* acceleration analysis */
     std::vector<Assembly, aaA >& leafBodies = tree[0];
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Acc_Leaves);
+#endif
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < input.Nbodies; i++)
         leafBodies[i].setKsiAcc(i, alphaAbs, dAlphaAbs, P1art, input);
-        
+}
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Acc_Asm);
+#endif
     for (int i = 1; i < input.Ntiers; i++) {
         std::vector<Assembly, aaA >& branch = tree[i];
         std::vector<Assembly, aaA >& upperBranch = tree[i-1];
@@ -574,13 +670,17 @@ void odeint_observer::operator()( const state_type &y , double t )
         if (Nparents % 2 == 1)
 			branch.back().assembleAcc(upperBranch.back());
     }
-
+}
 
     /* base body connection */
     Assembly& AssemblyS = tree[input.Ntiers-1][0];
     AssemblyS.connect_base_bodyAcc();
 	AssemblyS.disassembleAcc();
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Acc_Disasm);
+#endif
     const int prelastTier = input.Ntiers-2;
 	for (int i = prelastTier; i > 0; i--) {
         const int Nparents_even = input.tiersInfo[i-1] / 2;
@@ -593,6 +693,7 @@ void odeint_observer::operator()( const state_type &y , double t )
 		if (input.tiersInfo[i-1] % 2 == 1)
 			tree[i-1].back().setAcc(tree[i].back());
 	}
+}
 
     /* joint acceleration calculation */
     const Vector3d Hground = input.pickBodyType(0).H;
@@ -600,6 +701,10 @@ void odeint_observer::operator()( const state_type &y , double t )
 	d2alpha(0) = Hground.transpose() * leafBodies[0].calculate_dV1();
     lambda.segment(0,2) = Dground.transpose() * leafBodies[0].L1_();
 
+{
+#if EX_PROFILE
+    procTimer T(Timer_Fwd_Proj);
+#endif
 #pragma omp parallel for schedule(static)
 	for (int i = 1; i < input.tiersInfo[0]; i++) {
         const Vector3d H = input.pickBodyType(i).H;
@@ -609,11 +714,12 @@ void odeint_observer::operator()( const state_type &y , double t )
 		d2alpha(i) = H.transpose() * (dV1B - dV2A);
         lambda.segment(2*i, 2) = D.transpose() * leafBodies[i].L1_();
 	}
+}
     
     solution.setD2alpha(index, d2alpha);
     solution.setLambda( index, lambda);
 
-#if SHOW_PROGRESS
+#if EX_SHOW_PROGRESS
     static int cnt = 0;
     double Tcnt = input.Tk / 10.0 * cnt;
     if (t >= Tcnt) {

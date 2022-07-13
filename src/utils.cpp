@@ -1,8 +1,9 @@
 #include "../include/utils.h"
 #include "../include/input.h"
-#include "../Eigen/Dense"
 #include "../include/constants.h"
 #include "../include/task/M.h"
+#include "../include/config.h"
+#include "../Eigen/Dense"
 #include "omp.h"
 
 #include <iostream>
@@ -10,12 +11,9 @@
 #include <iterator> // ostream_iterator
 #include <iomanip> // setw, setprecision
 #include <math.h>
-
 using namespace Eigen;
 
-#define PARALLEL_UTILS true
-
-#if PARALLEL_UTILS
+#if EX_PARALLEL_UTILS
 
 VectorXd joint2AbsAngles(const VectorXd &alpha)
 {
